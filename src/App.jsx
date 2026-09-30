@@ -17,7 +17,7 @@ function BrandMark(){return <svg className="auth-mark" viewBox="0 0 64 64" aria-
 
 function ThemeToggle({theme,onChange}){return <div className="theme-toggle" aria-label="Tema"><button type="button" className={theme==='light'?'selected':''} aria-label="Tema claro" title="Tema claro" onClick={()=>onChange('light')}>☼</button><button type="button" className={theme==='dark'?'selected':''} aria-label="Tema oscuro" title="Tema oscuro" onClick={()=>onChange('dark')}>☾</button></div>}
 
-function Login({theme,onThemeChange}){const[mode,setMode]=useState('login');const[name,setName]=useState('');const[area,setArea]=useState('');const[email,setEmail]=useState('');const[password,setPassword]=useState('');const[message,setMessage]=useState('');const[busy,setBusy]=useState(false);
+function Login({theme,onThemeChange}){const[mode,setMode]=useState('login');const[name,setName]=useState('');const[area,setArea]=useState('');const[email,setEmail]=useState('');const[password,setPassword]=useState('');const[showPassword,setShowPassword]=useState(false);const[message,setMessage]=useState('');const[busy,setBusy]=useState(false);
  const requesting=mode==='request';
  const submit=async event=>{event.preventDefault();setMessage('');setBusy(true);
   if(requesting){const{data,error}=await sb.auth.signUp({email,password,options:{data:{full_name:name.trim(),area:area.trim()||null}}});
@@ -30,12 +30,12 @@ function Login({theme,onThemeChange}){const[mode,setMode]=useState('login');cons
   <form className="auth-form" onSubmit={submit}>
    {requesting&&<><label htmlFor="auth-name">Nombre completo</label><input id="auth-name" autoComplete="name" value={name} onChange={event=>setName(event.target.value)} required/></>}
    <label htmlFor="auth-email">Correo electrónico</label><input id="auth-email" type="email" autoComplete="email" value={email} onChange={event=>setEmail(event.target.value)} required/>
-   <label htmlFor="auth-password">Contraseña</label><input id="auth-password" type="password" autoComplete={requesting?'new-password':'current-password'} minLength={requesting?6:undefined} value={password} onChange={event=>setPassword(event.target.value)} required/>
+    <label htmlFor="auth-password">Contraseña</label><div className="password-field"><input id="auth-password" type={showPassword?'text':'password'} autoComplete={requesting?'new-password':'current-password'} minLength={requesting?6:undefined} value={password} onChange={event=>setPassword(event.target.value)} required/><button className="password-toggle" type="button" aria-label={showPassword?'Ocultar contraseña':'Mostrar contraseña'} aria-pressed={showPassword} title={showPassword?'Ocultar contraseña':'Mostrar contraseña'} onClick={()=>setShowPassword(value=>!value)}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{showPassword?<><path d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8"/><path d="M9.9 5.2A11 11 0 0121 12a11 11 0 01-4.2 5.3M6.2 6.3A11 11 0 003 12a11 11 0 004.2 5.3 11 11 0 008.4 1.5"/></>:<><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></>}</svg></button></div>
    {requesting&&<><label htmlFor="auth-area">Área o puesto <span>(opcional)</span></label><input id="auth-area" placeholder="Ej. Ventas, Instalaciones" value={area} onChange={event=>setArea(event.target.value)}/></>}
    <button className="auth-submit" type="submit" disabled={busy}>{busy?'PROCESANDO…':requesting?'SOLICITAR ACCESO':'ENTRAR AL DASHBOARD'} <span aria-hidden="true">{requesting?'↗':'♢'}</span></button>
   </form>
   {message&&<p className="auth-message" role="status">{message}</p>}
-  <p className="auth-switch">{requesting?'¿Ya tienes cuenta?':'¿Aún no tienes cuenta?'} <button type="button" onClick={()=>{setMode(requesting?'login':'request');setMessage('')}}>{requesting?'Inicia sesión':'Solicita acceso'}</button></p>
+    <p className="auth-switch">{requesting?'¿Ya tienes cuenta?':'¿Aún no tienes cuenta?'} <button type="button" onClick={()=>{setMode(requesting?'login':'request');setShowPassword(false);setMessage('')}}>{requesting?'Inicia sesión':'Solicita acceso'}</button></p>
   <footer className="auth-footer">SISTEMA DE SEGURIDAD THERMO HOUSE © {new Date().getFullYear()}</footer>
  </section></main>}
 

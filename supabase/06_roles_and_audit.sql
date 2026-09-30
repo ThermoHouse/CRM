@@ -34,6 +34,17 @@ alter table public.profiles
   add constraint profiles_role_check
   check (role is null or role in ('root','sales','operations','administrative'));
 
+do $$
+begin
+  if (select count(*) from auth.users) = 1 then
+    update public.profiles p
+    set role = 'root'
+    from auth.users u
+    where p.id = u.id and p.role is null;
+  end if;
+end;
+$$;
+
 create table if not exists public.security_events (
   id bigint generated always as identity primary key,
   actor_id uuid,
