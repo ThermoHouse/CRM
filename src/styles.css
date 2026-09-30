@@ -35,6 +35,7 @@ label{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercas
 .lead-row-actions{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;min-width:max-content}.lead-row-actions .btn{margin:0;white-space:nowrap}.lead-row-actions a.btn{display:inline-flex;align-items:center;text-decoration:none}
 .panel-feedback,.data-alert{padding:13px 16px;border-radius:12px;background:var(--card);border:1px solid var(--line);color:var(--mut);font-size:13px;margin:0 0 14px}
 .data-alert{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 35%,var(--line))}
+.role-picker{min-width:190px}.audit-table table{min-width:850px}
 @media(max-width:760px){.dashboard-toolbar{grid-template-columns:1fr;align-items:start}.lead-toolbar{grid-template-columns:1fr}.lead-main-actions{width:100%}.lead-search{max-width:none}.filter-controls select{flex:1;min-width:0}}
 @media(max-width:420px){.lead-main-actions{display:grid;grid-template-columns:1fr}.lead-search{width:100%;max-width:none}}
 @media(max-width:600px){.modal{padding:12px}.modal>.card{max-height:calc(100svh - 24px);padding:15px;border-radius:16px}.modal .f{grid-template-columns:1fr}.modal .f .w{grid-column:auto}.modal .row{gap:6px}}
