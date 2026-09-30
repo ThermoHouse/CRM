@@ -1,10 +1,19 @@
 # Nexus Admin (CRM ThermoHouse)
-1. Supabase: crea un proyecto → SQL Editor → pega y ejecuta `supabase/schema.sql`. En Authentication → Users crea tu usuario.
-2. Local: `cp .env.example .env` (URL y anon key en Settings → API), luego `npm i && npm run dev`.
-3. GitHub: `git init && git add . && git commit -m "init" && git branch -M main && git remote add origin <repo> && git push -u origin main`.
-4. Vercel: Import del repo (framework Vite) → agrega VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY → Deploy.
+1. Supabase: crea un proyecto y ejecuta `supabase/schema.sql` desde SQL Editor. En Authentication → Users crea tu usuario administrador inicial.
+2. Si usas las funciones del blueprint, ejecuta `supabase/04_blueprint.sql`.
+3. Ejecuta `supabase/05_access_requests.sql` después de las demás migraciones. Los usuarios existentes conservan acceso como miembros; las nuevas solicitudes quedan pendientes sin rol.
+4. En Supabase Authentication → Providers → Email, habilita el registro de usuarios para que el equipo pueda solicitar acceso.
+5. Local: configura `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, luego ejecuta `npm install` y `npm run dev`.
+6. Vercel: importa el repo (framework Vite) y agrega `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`.
 
-## Avance 2 (blueprint)
-5. Supabase → SQL Editor: ejecuta `supabase/04_blueprint.sql` (estado "visitado", auditoría, inventario inmutable, garantía automática al entregar obra, función `marcar_rescatar`).
-6. Novedades: tema claro/oscuro, Dashboard completo con filtros de plaza y periodo, WhatsApp directo, Convertir del Inbox a lead, Visitas → "Visitado", PDF sin campos vacíos.
-Pendiente: RLS por plaza, vista Barriles/Registro inmutable/ADN, roles, recordatorios de mantenimiento, webhook del bot.
+## Aprobar solicitudes
+Revisa al miembro y asigna el rol apropiado desde SQL Editor. Asignar un rol habilita su acceso al panel y a los datos.
+
+```sql
+update public.profiles
+set role = 'member'
+where id = (select id from auth.users where email = 'persona@empresa.com')
+	and role is null;
+```
+
+El campo `full_name` y el área declarada quedan guardados en `public.profiles` para revisión.

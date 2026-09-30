@@ -11,10 +11,33 @@ const tally=(l,f)=>Object.entries(l.reduce((a,x)=>{const k=f(x)||'Sin dato';a[k]
 const money=n=>'$'+Number(n||0).toLocaleString('es-MX');
 const useRows=(t,order='created_at')=>{const[r,setR]=useState([]);const load=useCallback(async()=>{const{data}=await sb.from(t).select('*').order(order,{ascending:false});setR(data||[])},[t,order]);useEffect(()=>{load()},[load]);return[r,load]};
 
-function Login(){const[e,setE]=useState('');const[p,setP]=useState('');const[m,setM]=useState('');
- return <div className="login"><h1>NEXUS <b>ADMIN</b></h1><input placeholder="Correo" value={e} onChange={x=>setE(x.target.value)}/>
- <input type="password" placeholder="Contraseña" value={p} onChange={x=>setP(x.target.value)}/>
- <button className="btn" onClick={async()=>{const{error}=await sb.auth.signInWithPassword({email:e,password:p});if(error)setM(error.message)}}>Entrar</button><span className="mut">{m}</span></div>}
+function BrandMark(){return <svg className="auth-mark" viewBox="0 0 64 64" aria-hidden="true"><path d="M17 21h30l9 11H8l9-11Z" fill="currentColor"/><path d="M18 32h12v12h8V32h12v26H38v-9H30v9H18V32Z" fill="#0872ba"/><path d="M25 18V8m7 10V4m7 14 6-7m-20 7-6-7" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg>}
+
+function ThemeToggle({theme,onChange}){return <div className="theme-toggle" aria-label="Tema"><button type="button" className={theme==='light'?'selected':''} aria-label="Tema claro" title="Tema claro" onClick={()=>onChange('light')}>☼</button><button type="button" className={theme==='dark'?'selected':''} aria-label="Tema oscuro" title="Tema oscuro" onClick={()=>onChange('dark')}>☾</button></div>}
+
+function Login({theme,onThemeChange}){const[mode,setMode]=useState('login');const[name,setName]=useState('');const[area,setArea]=useState('');const[email,setEmail]=useState('');const[password,setPassword]=useState('');const[message,setMessage]=useState('');const[busy,setBusy]=useState(false);
+ const requesting=mode==='request';
+ const submit=async event=>{event.preventDefault();setMessage('');setBusy(true);
+  if(requesting){const{data,error}=await sb.auth.signUp({email,password,options:{data:{full_name:name.trim(),area:area.trim()||null}}});
+   if(error)setMessage(error.message);else setMessage(data.session?'Solicitud enviada. Tu cuenta quedará pendiente de aprobación.':'Solicitud recibida. Revisa tu correo para confirmar la cuenta; después quedará pendiente de aprobación.');
+  }else{const{error}=await sb.auth.signInWithPassword({email,password});if(error)setMessage(error.message)}
+  setBusy(false);
+ };
+ return <main className="auth-screen"><ThemeToggle theme={theme} onChange={onThemeChange}/><section className="auth-panel">
+  <div className="auth-heading"><BrandMark/><h1>{requesting?'SOLICITAR ACCESO':'ACCESO SEGURO'}</h1><p>PANEL DE CONTROL THERMO HOUSE</p></div>
+  <form className="auth-form" onSubmit={submit}>
+   {requesting&&<><label htmlFor="auth-name">Nombre completo</label><input id="auth-name" autoComplete="name" value={name} onChange={event=>setName(event.target.value)} required/></>}
+   <label htmlFor="auth-email">Correo electrónico</label><input id="auth-email" type="email" autoComplete="email" value={email} onChange={event=>setEmail(event.target.value)} required/>
+   <label htmlFor="auth-password">Contraseña</label><input id="auth-password" type="password" autoComplete={requesting?'new-password':'current-password'} minLength={requesting?6:undefined} value={password} onChange={event=>setPassword(event.target.value)} required/>
+   {requesting&&<><label htmlFor="auth-area">Área o puesto <span>(opcional)</span></label><input id="auth-area" placeholder="Ej. Ventas, Instalaciones" value={area} onChange={event=>setArea(event.target.value)}/></>}
+   <button className="auth-submit" type="submit" disabled={busy}>{busy?'PROCESANDO…':requesting?'SOLICITAR ACCESO':'ENTRAR AL DASHBOARD'} <span aria-hidden="true">{requesting?'↗':'♢'}</span></button>
+  </form>
+  {message&&<p className="auth-message" role="status">{message}</p>}
+  <p className="auth-switch">{requesting?'¿Ya tienes cuenta?':'¿Aún no tienes cuenta?'} <button type="button" onClick={()=>{setMode(requesting?'login':'request');setMessage('')}}>{requesting?'Inicia sesión':'Solicita acceso'}</button></p>
+  <footer className="auth-footer">SISTEMA DE SEGURIDAD THERMO HOUSE © {new Date().getFullYear()}</footer>
+ </section></main>}
+
+function AccessStatus({error,onSignOut}){return <main className="auth-screen"><section className="auth-panel auth-status"><BrandMark/><h1>{error?'NO SE PUDO VALIDAR TU ACCESO':'SOLICITUD PENDIENTE'}</h1><p>{error?'Ocurrió un problema al consultar tu autorización. Intenta de nuevo más tarde.':'Tu cuenta está pendiente de aprobación. Un administrador debe asignarte un rol para habilitar el acceso.'}</p><button className="auth-submit" onClick={onSignOut}>CERRAR SESIÓN</button></section></main>}
 
 function Dashboard(){const[all]=useRows('leads');const[plaza,setPlaza]=useState('');const[per,setPer]=useState(0);
  const l=all.filter(x=>inPer(x,per)&&(!plaza||(x.ciudad||'').includes(plaza)));const n=l.length||1;const c=s=>l.filter(x=>x.status===s).length;
@@ -79,9 +102,14 @@ function Precios(){const[r,load]=useRows('tarifas','producto_id');
  return <div className="card"><h3>Lista de tarifas regionales</h3><table><thead><tr><th>Ciudad</th><th>Sistema</th><th>Contado /m²</th><th>MSI /m²</th><th>Mínimo</th></tr></thead><tbody>
  {r.map(x=><tr key={x.id}><td>{x.ciudad}</td><td>{x.producto_id}</td>{['precio_contado','precio_msi','minimo'].map(k=><td key={k}><input style={{width:90}} defaultValue={x[k]} onBlur={e=>up(x.id,k,e.target.value)}/></td>)}</tr>)}</tbody></table></div>}
 
-export default function App(){const[s,setS]=useState(null);const[tab,setTab]=useState('Dashboard');
- useEffect(()=>{sb.auth.getSession().then(({data})=>setS(data.session));const{data:{subscription}}=sb.auth.onAuthStateChange((_,x)=>setS(x));return()=>subscription.unsubscribe()},[]);
- if(!s)return <Login/>;
+export default function App(){const[s,setS]=useState(null);const[authReady,setAuthReady]=useState(false);const[profile,setProfile]=useState(null);const[profileLoading,setProfileLoading]=useState(false);const[profileError,setProfileError]=useState(false);const[tab,setTab]=useState('Dashboard');const[dk,setDk]=useState(()=>localStorage.getItem('th')||'dark');
+ useEffect(()=>{document.documentElement.dataset.theme=dk;localStorage.setItem('th',dk)},[dk]);
+ useEffect(()=>{sb.auth.getSession().then(({data})=>{setS(data.session);setAuthReady(true)});const{data:{subscription}}=sb.auth.onAuthStateChange((_,x)=>{setS(x);setAuthReady(true)});return()=>subscription.unsubscribe()},[]);
+ useEffect(()=>{if(!s){setProfile(null);setProfileError(false);return}let active=true;setProfileLoading(true);sb.from('profiles').select('full_name,role').eq('id',s.user.id).single().then(({data,error})=>{if(active){setProfile(data);setProfileError(Boolean(error));setProfileLoading(false)}});return()=>{active=false}},[s?.user?.id]);
+ if(!authReady)return <main className="auth-screen"><div className="auth-loading">THERMO HOUSE</div></main>;
+ if(!s)return <Login theme={dk} onThemeChange={setDk}/>;
+ if(profileLoading)return <main className="auth-screen"><div className="auth-loading">VALIDANDO ACCESO…</div></main>;
+ if(profileError||!profile||!profile.role)return <AccessStatus error={profileError} onSignOut={()=>sb.auth.signOut()}/>;
  const V={Dashboard:<Dashboard/>,Leads:<Leads/>,
  'Inbox Bot':<Crud table="bot_inbox" title="Buzón bot" extra={(x,ld)=>x.status!=='convertido'&&<button className="btn" onClick={async()=>{const{data:{user}}=await sb.auth.getUser();const{error}=await sb.from('leads').insert({nombre:x.nombre,whatsapp:x.telefono,ciudad:x.ciudad,sistema:x.sistema,total:x.monto||0,origen:'Bot WhatsApp',notas:x.notas,asesor:user.email,folio:'QT-'+Date.now().toString().slice(-4)});if(error)return alert(error.message);await sb.from('bot_inbox').update({status:'convertido'}).eq('id',x.id);ld()}}>Convertir</button>} fields={[['nombre','Nombre'],['telefono','Teléfono'],['ciudad','Ciudad'],['sistema','Sistema'],['monto','Monto','number'],['status','Status','select',['pendiente','contactado','convertido','descartado']],['notas','Notas']]}/>,
  Visitas:<Crud table="visitas" title="Visitas" extra={(x,ld)=>x.status==='por_visitar'&&<button className="btn" onClick={async()=>{await sb.from('visitas').update({status:'realizada'}).eq('id',x.id);if(x.lead_id)await sb.from('leads').update({status:'visitado'}).eq('id',x.lead_id);ld()}}>Marcar hecha</button>} order="programacion" fields={[['cliente','Cliente'],['ubicacion','Ubicación'],['programacion','Programación','datetime-local'],['status','Status','select',['por_visitar','realizada','cancelada']]]}/>,
@@ -89,5 +117,4 @@ export default function App(){const[s,setS]=useState(null);const[tab,setTab]=use
  Mantenimiento:<Crud table="garantias" title="Gestión de garantías" order="proximo_mtto" fields={[['cliente','Cliente'],['folio','Folio'],['sistema','Sistema'],['instalacion','Instalación','date'],['proximo_mtto','Próximo mtto.','date'],['status','Status','select',['activa','vencida','mantenimiento_hecho']]]}/>,
  Operaciones:<Precios/>,
  Inventario:<Crud table="barriles" title="Control de inventario · barriles" order="entrada" fields={[['plaza','Plaza','select',['Cuernavaca','Chihuahua','Playa del Carmen','Mérida']],['tipo','Tipo','select',['isocianato','poliol']],['lote','Lote'],['estado','Estado','select',['cerrado','abierto','vacío']],['entrada','Entrada','date']]}/>};
- const[dk,setDk]=useState(()=>localStorage.getItem('th')||'dark');useEffect(()=>{document.documentElement.dataset.theme=dk;localStorage.setItem('th',dk)},[dk]);
- return <><header><div className="brand"><span className="logo">N</span><div><h1>NEXUS <b>ADMIN</b> <span className="mut">V1.1</span></h1><span className="badge">Acceso total</span> <span className="mut">{s.user?.email}</span></div></div><nav>{TABS.map(t=><button key={t} className={t===tab?'on':''} onClick={()=>setTab(t)}>{t}</button>)}</nav><div className="row" style={{margin:0}}><button className="btn ghost" onClick={()=>setDk(dk==='dark'?'light':'dark')}>{dk==='dark'?'☀️ Claro':'🌙 Oscuro'}</button><button className="btn red" onClick={()=>sb.auth.signOut()}>Salir</button></div></header><main>{V[tab]}</main></>}
+ return <><header><div className="brand"><span className="logo">N</span><div><h1>NEXUS <b>ADMIN</b> <span className="mut">V1.1</span></h1><span className="badge">Acceso total</span> <span className="mut">{s.user?.email}</span></div></div><nav>{TABS.map(t=><button key={t} className={t===tab?'on':''} onClick={()=>setTab(t)}>{t}</button>)}</nav><div className="row" style={{margin:0}}><button className="btn ghost" onClick={()=>setDk(dk==='dark'?'light':'dark')}>{dk==='dark'?'☀ Claro':'☾ Oscuro'}</button><button className="btn red" onClick={()=>sb.auth.signOut()}>Salir</button></div></header><main>{V[tab]}</main></>}
