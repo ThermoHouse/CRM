@@ -6,7 +6,8 @@
 5. Ejecuta `supabase/08_plazas.sql` después de `06`. Crea la plaza Morelos, agrega la columna de plaza a leads y sincroniza las opciones del inventario.
 6. Ejecuta `supabase/09_lead_followups.sql` después de `08` para habilitar los nuevos estados del semáforo y las fechas de llamada.
 7. Ejecuta `supabase/10_sales_directory.sql` para que filtros e informes muestren nombres de vendedores sin exponer sus correos.
-8. Solo si ya hay varias cuentas y quieres elegir otra manualmente, asigna root en SQL Editor, reemplazando el correo:
+8. Ejecuta `supabase/11_fix_lead_audit_trigger.sql` para que los cambios de estado de leads escriban su bitácora de forma segura.
+9. Solo si ya hay varias cuentas y quieres elegir otra manualmente, asigna root en SQL Editor, reemplazando el correo:
 
 ```sql
 update public.profiles
@@ -14,9 +15,9 @@ set role = 'root'
 where email = 'root@empresa.com';
 ```
 
-9. Reinicia la sesión de la app. Root podrá asignar `sales`, `operations` o `administrative` desde la pestaña **Usuarios**.
-10. En Authentication → Providers → Email, habilita el registro para que el equipo solicite acceso.
-11. Local: configura `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, luego ejecuta `npm install` y `npm run dev`. En Vercel configura las mismas variables para los entornos que publiques.
+10. Reinicia la sesión de la app. Root podrá asignar `sales`, `operations` o `administrative` desde la pestaña **Usuarios**.
+11. En Authentication → Providers → Email, habilita el registro para que el equipo solicite acceso.
+12. Local: configura `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, luego ejecuta `npm install` y `npm run dev`. En Vercel configura las mismas variables para los entornos que publiques.
 
 ## Permisos
 - `root`: todos los módulos, aprobación de usuarios y auditoría.

@@ -7,9 +7,20 @@ create table if not exists lead_audit(id uuid primary key default gen_random_uui
 alter table lead_audit enable row level security;
 create policy "audit_read" on lead_audit for select to authenticated using(true);
 create policy "audit_ins" on lead_audit for insert to authenticated with check(true);
-create or replace function log_status() returns trigger language plpgsql as $$
-begin if new.status is distinct from old.status then
-  insert into lead_audit(lead_id,de,a) values(new.id,old.status,new.status); new.last_contact_at:=now(); end if; return new; end $$;
+create or replace function public.log_status()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.status is distinct from old.status then
+    insert into public.lead_audit(lead_id,de,a) values(new.id,old.status,new.status);
+    new.last_contact_at:=now();
+  end if;
+  return new;
+end;
+$$;
 drop trigger if exists t_log_status on leads;
 create trigger t_log_status before update on leads for each row execute function log_status();
 
