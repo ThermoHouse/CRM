@@ -9,7 +9,8 @@
 8. Ejecuta `supabase/11_fix_lead_audit_trigger.sql` para que los cambios de estado de leads escriban su bitácora de forma segura.
 9. Ejecuta `supabase/12_calendar_appointments.sql` para guardar citas de Google Calendar en los leads.
 10. Ejecuta `supabase/13_dashboard_corrections.sql` para dejar activa únicamente la plaza Morelos (sin borrar las demás), agregar vendedor y revisitas, y habilitar precio máximo.
-11. Solo si ya hay varias cuentas y quieres elegir otra manualmente, asigna root en SQL Editor, reemplazando el correo:
+11. Ejecuta `supabase/14_user_profiles_and_gmail.sql` para habilitar perfiles editables, fotos privadas y conexiones Gmail.
+12. Solo si ya hay varias cuentas y quieres elegir otra manualmente, asigna root en SQL Editor, reemplazando el correo:
 
 ```sql
 update public.profiles
@@ -17,9 +18,9 @@ set role = 'root'
 where email = 'root@empresa.com';
 ```
 
-12. Reinicia la sesión de la app. Root podrá asignar `sales`, `operations` o `administrative` desde la pestaña **Usuarios**.
-13. En Authentication → Providers → Email, habilita el registro para que el equipo solicite acceso.
-14. Local: configura `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, luego ejecuta `npm install` y `npm run dev`. En Vercel configura las mismas variables para los entornos que publiques.
+13. Reinicia la sesión de la app. Root podrá asignar `sales`, `operations` o `administrative` desde la pestaña **Usuarios**.
+14. En Authentication → Providers → Email, habilita el registro para que el equipo solicite acceso.
+15. Local: configura `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, luego ejecuta `npm install` y `npm run dev`. En Vercel configura las mismas variables para los entornos que publiques.
 
 ## Permisos
 - `root`: todos los módulos, aprobación de usuarios y auditoría.
@@ -28,6 +29,14 @@ where email = 'root@empresa.com';
 - `administrative`: lectura de todos los módulos actuales; edición de tarifas, productos e inventario.
 
 Los cambios de filas se registran en `public.security_events`, visible solo para root. Los intentos de inicio de sesión fallidos se consultan en Supabase Auth Logs. Los rechazos de políticas RLS y eventos de infraestructura requieren un Log Drain para centralizarlos; no se pueden registrar de forma confiable desde el navegador. La bitácora de la app guarda metadatos, no el contenido completo de los registros.
+
+## Perfil y conexión Gmail
+1. En Google Cloud configura un OAuth Client ID tipo Web y agrega como URI de redirección autorizada `https://<project-ref>.supabase.co/functions/v1/gmail-connect`.
+2. Habilita la pantalla de consentimiento OAuth y agrega como usuarios de prueba a quienes conectarán su correo. La integración solicita `gmail.readonly` y `gmail.send`; Google puede requerir verificación para publicar estos permisos.
+3. En Supabase → Edge Functions → Secrets configura `GMAIL_OAUTH_CLIENT_ID`, `GMAIL_OAUTH_CLIENT_SECRET`, `GMAIL_OAUTH_STATE_SECRET`, `GMAIL_TOKEN_ENCRYPTION_KEY` y `APP_URL`. `APP_URL` debe ser el origen exacto del CRM. La clave de cifrado debe ser 32 bytes codificados en Base64; genera y conserva los secretos fuera del cliente.
+4. Despliega con `supabase functions deploy gmail-connect --no-verify-jwt`. El callback OAuth llega sin JWT; la función verifica por sí misma la sesión para acciones de usuario y firma/valida el estado del callback.
+
+Las fotos se guardan en un bucket privado, y cada usuario solo puede cambiar sus propios datos. Los refresh tokens Gmail se cifran en servidor y nunca se devuelven al navegador.
 
 ## Google Calendar y avisos
 1. Habilita **Google Calendar API** en el proyecto de Google Cloud. Si `gcloud services enable` responde `429 RESOURCE_EXHAUSTED`, revisa primero si Calendar API ya aparece habilitada y vuelve a intentar una sola vez cuando se libere el límite de solicitudes.
