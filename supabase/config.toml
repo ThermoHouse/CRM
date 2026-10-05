@@ -1,0 +1,2 @@
+[functions.bot-api]
+verify_jwt = false

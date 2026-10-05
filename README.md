@@ -20,7 +20,10 @@ where email = 'root@empresa.com';
 
 13. Reinicia la sesión de la app. Root podrá asignar `sales`, `operations` o `administrative` desde la pestaña **Usuarios**.
 14. En Authentication → Providers → Email, habilita el registro para que el equipo solicite acceso.
-15. Local: configura `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, luego ejecuta `npm install` y `npm run dev`. En Vercel configura las mismas variables para los entornos que publiques.
+15. Ejecuta `supabase/15_whatsapp_phase1.sql` para crear el esquema de conversaciones de WhatsApp y sus políticas de lectura por rol.
+16. Ejecuta `supabase/16_whatsapp_bot_api.sql` para activar las operaciones transaccionales y el límite de solicitudes de la API de n8n.
+17. Ejecuta `supabase/17_lead_contact_attempts.sql` para guardar llamadas, WhatsApp, correos y otros intentos de contacto con su fecha/hora.
+18. Local: configura `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, luego ejecuta `npm install` y `npm run dev`. En Vercel configura las mismas variables para los entornos que publiques.
 
 ## Permisos
 - `root`: todos los módulos, aprobación de usuarios y auditoría.
@@ -37,6 +40,40 @@ Los cambios de filas se registran en `public.security_events`, visible solo para
 4. Despliega con `supabase functions deploy gmail-connect --no-verify-jwt`. El callback OAuth llega sin JWT; la función verifica por sí misma la sesión para acciones de usuario y firma/valida el estado del callback.
 
 Las fotos se guardan en un bucket privado, y cada usuario solo puede cambiar sus propios datos. Los refresh tokens Gmail se cifran en servidor y nunca se devuelven al navegador.
+
+## WhatsApp con n8n · Fase 2
+La API vive en Supabase Edge Functions: `https://<project-ref>.supabase.co/functions/v1/bot-api`. Configura `CRM_API_KEY` en Supabase → Edge Functions → Secrets. Supabase proporciona `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` al runtime de la función; no las agregues al frontend ni al repositorio. `N8N_WEBHOOK_URL` y `N8N_WEBHOOK_SECRET` se usarán en la Fase 3 para mensajes iniciados por vendedores.
+
+Despliega después de aplicar `supabase/15_whatsapp_phase1.sql` y `supabase/16_whatsapp_bot_api.sql`:
+
+```sh
+supabase functions deploy bot-api
+```
+
+La API limita a 120 solicitudes por minuto y por IP. Ejemplos para Bash o Git Bash:
+
+```sh
+export SUPABASE_URL="https://<project-ref>.supabase.co"
+export CRM_API_KEY="<CRM_API_KEY>"
+
+# Ingresar un mensaje. Repite exactamente esta petición para probar que el wa_message_id no duplica.
+curl -X POST "$SUPABASE_URL/functions/v1/bot-api/messages" \
+	-H "x-api-key: $CRM_API_KEY" -H "Content-Type: application/json" \
+	-d '{"phone":"+5215551234567","name":"Cliente de prueba","wa_message_id":"wamid.test-001","direction":"in","sender":"cliente","type":"text","body":"Hola","is_test":true}'
+
+# Registrar handoff.
+curl -X POST "$SUPABASE_URL/functions/v1/bot-api/events" \
+	-H "x-api-key: $CRM_API_KEY" -H "Content-Type: application/json" \
+	-d '{"phone":"+5215551234567","type":"handoff","payload":{"origen":"n8n"}}'
+
+# Consultar si n8n debe responder. El signo + debe ir codificado como %2B.
+curl --path-as-is "$SUPABASE_URL/functions/v1/bot-api/conversations/%2B5215551234567/state" \
+	-H "x-api-key: $CRM_API_KEY"
+
+# API key incorrecta: debe responder 401.
+curl -i "$SUPABASE_URL/functions/v1/bot-api/conversations/%2B5215551234567/state" \
+	-H "x-api-key: incorrecta"
+```
 
 ## Google Calendar y avisos
 1. Habilita **Google Calendar API** en el proyecto de Google Cloud. Si `gcloud services enable` responde `429 RESOURCE_EXHAUSTED`, revisa primero si Calendar API ya aparece habilitada y vuelve a intentar una sola vez cuando se libere el límite de solicitudes.
