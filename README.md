@@ -23,7 +23,8 @@ where email = 'root@empresa.com';
 15. Ejecuta `supabase/15_whatsapp_phase1.sql` para crear el esquema de conversaciones de WhatsApp y sus políticas de lectura por rol.
 16. Ejecuta `supabase/16_whatsapp_bot_api.sql` para activar las operaciones transaccionales y el límite de solicitudes de la API de n8n.
 17. Ejecuta `supabase/17_lead_contact_attempts.sql` para guardar llamadas, WhatsApp, correos y otros intentos de contacto con su fecha/hora.
-18. Local: configura `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, luego ejecuta `npm install` y `npm run dev`. En Vercel configura las mismas variables para los entornos que publiques.
+18. En Supabase → Edge Functions → Secrets agrega `N8N_WEBHOOK_URL` y `N8N_WEBHOOK_SECRET` para que los vendedores puedan enviar WhatsApp desde el CRM.
+19. Local: configura `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, luego ejecuta `npm install` y `npm run dev`. En Vercel configura las mismas variables para los entornos que publiques.
 
 ## Permisos
 - `root`: todos los módulos, aprobación de usuarios y auditoría.
@@ -74,6 +75,15 @@ curl --path-as-is "$SUPABASE_URL/functions/v1/bot-api/conversations/%2B521555123
 curl -i "$SUPABASE_URL/functions/v1/bot-api/conversations/%2B5215551234567/state" \
 	-H "x-api-key: incorrecta"
 ```
+
+## Conversaciones para vendedores · Fase 3
+Despliega la API autenticada con `supabase functions deploy crm-conversations`. Todas las rutas requieren la sesión de Supabase del usuario. La URL base es `https://<project-ref>.supabase.co/functions/v1/crm-conversations`:
+
+- `GET /conversations`: filtros `status`, `assigned_to`, `desde`, `hasta` y `q`; Ventas solo recibe sus conversaciones asignadas. Los chats de prueba se excluyen por defecto; usa `?test=true` solo para consultarlos.
+- `GET /conversations/{id}`: mensajes, eventos y datos del lead.
+- `PATCH /conversations/{id}/lead`: edita `lead` y opcionalmente `assigned_to`.
+- `POST /conversations/{id}/status`: acepta `bot`, `humano` o `cerrada` y registra pausa/reanudación.
+- `POST /conversations/{id}/send`: acepta `{ "text": "..." }`, reenvía por `N8N_WEBHOOK_URL` con `x-secret` y devuelve `409` si ya pasó la ventana de 24 horas. n8n debe devolver `wa_message_id` en su JSON de respuesta para conservar el mismo ID en el historial.
 
 ## Google Calendar y avisos
 1. Habilita **Google Calendar API** en el proyecto de Google Cloud. Si `gcloud services enable` responde `429 RESOURCE_EXHAUSTED`, revisa primero si Calendar API ya aparece habilitada y vuelve a intentar una sola vez cuando se libere el límite de solicitudes.

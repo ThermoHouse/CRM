@@ -1,2 +1,5 @@
 [functions.bot-api]
 verify_jwt = false
+
+[functions.crm-conversations]
+verify_jwt = true

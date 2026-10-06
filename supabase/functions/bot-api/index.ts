@@ -165,7 +165,6 @@ async function handleState(request: Request, phoneValue: string, admin: ReturnTy
   const { data, error } = await admin.from('conversations')
     .select('status,assigned_to')
     .eq('contact_id', contact.id)
-    .in('status', ['bot','humano'])
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
