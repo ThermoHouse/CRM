@@ -24,8 +24,11 @@ where email = 'root@empresa.com';
 16. Ejecuta `supabase/16_whatsapp_bot_api.sql` para activar las operaciones transaccionales y el límite de solicitudes de la API de n8n.
 17. Ejecuta `supabase/17_lead_contact_attempts.sql` para guardar llamadas, WhatsApp, correos y otros intentos de contacto con su fecha/hora.
 18. Ejecuta `supabase/18_sales_directory_with_ids.sql` para agrupar el historial de llamadas por vendedor en el dashboard.
-19. En Supabase → Edge Functions → Secrets agrega `N8N_WEBHOOK_URL` y `N8N_WEBHOOK_SECRET` para que los vendedores puedan enviar WhatsApp desde el CRM.
-20. Local: configura `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, luego ejecuta `npm install` y `npm run dev`. En Vercel configura las mismas variables para los entornos que publiques.
+19. Ejecuta `supabase/19_lead_followup_assignment.sql` para permitir asignar el seguimiento a otro vendedor sin mover la comisión del dueño original.
+20. En Supabase → Edge Functions → Secrets agrega `N8N_WEBHOOK_URL` y `N8N_WEBHOOK_SECRET` para que los vendedores puedan enviar WhatsApp desde el CRM.
+21. Local: configura `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, luego ejecuta `npm install` y `npm run dev`. En Vercel configura las mismas variables para los entornos que publiques.
+
+En Leads, **Dueño de comisión** conserva el asesor original (`leads.asesor`); **Seguimiento a cargo de** es la persona que dará seguimiento (`leads.followup_assigned_to`). El banner del Dashboard y Leads avisa al dueño original cuando otro vendedor atiende su cliente. La agenda de hoy se agrupa por quien tiene asignado el seguimiento.
 
 ## Permisos
 - `root`: todos los módulos, aprobación de usuarios y auditoría.
