@@ -27,14 +27,15 @@ where email = 'root@empresa.com';
 19. Ejecuta `supabase/19_lead_followup_assignment.sql` para permitir asignar el seguimiento a otro vendedor sin mover la comisión del dueño original.
 20. Ejecuta `supabase/20_lead_client_type.sql` para asegurar la columna de clasificación residencial/empresarial.
 21. Ejecuta `supabase/21_lead_price_adjustments.sql` para guardar precio base, ajuste por m², precio final y diferencia por cotización.
-22. En Supabase → Edge Functions → Secrets agrega `N8N_WEBHOOK_URL` y `N8N_WEBHOOK_SECRET` para que los vendedores puedan enviar WhatsApp desde el CRM.
-23. Local: configura `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, luego ejecuta `npm install` y `npm run dev`. En Vercel configura las mismas variables para los entornos que publiques.
+22. Ejecuta `supabase/22_quote_document_fields.sql` para guardar los datos editables del formato de cotización PDF.
+23. En Supabase → Edge Functions → Secrets agrega `N8N_WEBHOOK_URL` y `N8N_WEBHOOK_SECRET` para que los vendedores puedan enviar WhatsApp desde el CRM.
+24. Local: configura `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, luego ejecuta `npm install` y `npm run dev`. En Vercel configura las mismas variables para los entornos que publiques.
 
 En Leads, **Dueño de comisión** conserva el asesor original (`leads.asesor`); **Seguimiento a cargo de** es la persona que dará seguimiento (`leads.followup_assigned_to`). El banner del Dashboard y Leads avisa al dueño original cuando otro vendedor atiende su cliente. La agenda de hoy se agrupa por quien tiene asignado el seguimiento.
 
 En Leads, **Tipo de cliente** usa `leads.tipo_aplicacion`: `Residencial` o `Empresarial`. Los datos importados conservan su valor; los registros sin clasificación se pueden actualizar desde la fila y filtrar como **Sin clasificar**.
 
-En las cotizaciones, **Sistema / presentación** usa una sola selección. El ajuste por m² se guarda en cada lead junto con el precio base, precio final y diferencia total calculada después del mínimo; el reporte muestra al cliente solo el precio final.
+En las cotizaciones, **Sistema / presentación** usa una sola selección. El ajuste por m² se guarda en cada lead junto con el precio base, precio final y diferencia total calculada después del mínimo; el reporte muestra al cliente solo el precio final. Las especificaciones y observaciones del servicio se pueden editar, se guardan en el cliente y aparecen en el PDF.
 
 ## Permisos
 - `root`: todos los módulos, aprobación de usuarios y auditoría.
