@@ -100,3 +100,5 @@ main:has(.lead-table){width:100%;max-width:none}.lead-table{width:100%}.lead-tab
 .followup-owner-reopen{display:inline-flex;align-items:center;margin:0 0 14px;padding:7px 11px;border:1px solid color-mix(in srgb,var(--or) 38%,var(--line));border-radius:999px;background:color-mix(in srgb,var(--or) 6%,var(--card));color:var(--mut);font-size:11px;font-weight:700;cursor:pointer}
 .followup-owner-reopen:hover{border-color:var(--or);color:var(--tx)}
 .quote-specifications p,.quote-observations span{overflow-wrap:anywhere}
+.quote-brand{display:block;width:74mm;height:35.52mm;background-image:url('./assets/thermo-house-logo.png');background-position:left center;background-repeat:no-repeat;background-size:contain}
+.quote-brand>*{display:none}
