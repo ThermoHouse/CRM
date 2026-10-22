@@ -1,8 +1,11 @@
 # Nexus Admin (CRM ThermoHouse)
-1. Supabase: ejecuta `supabase/schema.sql` desde SQL Editor. En Authentication → Users crea la cuenta inicial que después será root.
+
+Consulta [SISTEMA.md](./SISTEMA.md) para conocer los módulos, roles, datos, automatizaciones e integraciones del sistema.
+
+1. Supabase: ejecuta `supabase/schema.sql` desde SQL Editor. Mantén deshabilitado el registro público y crea manualmente en Authentication → Users la cuenta que será root. El esquema base deja las tablas sin políticas de acceso hasta aplicar la migración de roles.
 2. Si usas el blueprint, ejecuta `supabase/04_blueprint.sql`; después ejecuta siempre `supabase/05_access_requests.sql` para crear perfiles y habilitar solicitudes.
-3. Ejecuta `supabase/06_roles_and_audit.sql` al final. Si esa migración encuentra exactamente una cuenta, la promueve automáticamente a `root`.
-4. Si necesitas promover un correo específico, ejecuta `supabase/07_promote_root.sql` después de `06`. El script verifica que exista exactamente una cuenta con ese correo; no crea usuarios ni modifica contraseñas. También puedes asignar otro root desde **Usuarios** una vez que el primero entre al panel.
+3. Ejecuta `supabase/06_roles_and_audit.sql` después de `05`. La migración configura permisos por rol, pero no asigna automáticamente el rol `root`.
+4. Para habilitar al administrador inicial, reemplaza el correo objetivo de `supabase/07_promote_root.sql` por el correo exacto de la cuenta que creaste y ejecútalo después de `06`. El script verifica que exista exactamente una cuenta con ese correo; no crea usuarios ni modifica contraseñas. También puedes asignar otros roles desde **Usuarios** una vez que el primer root entre al panel.
 5. Ejecuta `supabase/08_plazas.sql` después de `06`. Crea la plaza Morelos, agrega la columna de plaza a leads y sincroniza las opciones del inventario.
 6. Ejecuta `supabase/09_lead_followups.sql` después de `08` para habilitar los nuevos estados del semáforo y las fechas de llamada.
 7. Ejecuta `supabase/10_sales_directory.sql` para que filtros e informes muestren nombres de vendedores sin exponer sus correos.
@@ -10,7 +13,7 @@
 9. Ejecuta `supabase/12_calendar_appointments.sql` para guardar citas de Google Calendar en los leads.
 10. Ejecuta `supabase/13_dashboard_corrections.sql` para dejar activa únicamente la plaza Morelos (sin borrar las demás), agregar vendedor y revisitas, y habilitar precio máximo.
 11. Ejecuta `supabase/14_user_profiles_and_gmail.sql` para habilitar perfiles editables, fotos privadas y conexiones Gmail.
-12. Solo si ya hay varias cuentas y quieres elegir otra manualmente, asigna root en SQL Editor, reemplazando el correo:
+12. Si ya hay varias cuentas y quieres asignar otro root manualmente, reemplaza el correo en SQL Editor. Ejecuta esta consulta con una cuenta administrativa de confianza:
 
 ```sql
 update public.profiles
@@ -19,7 +22,7 @@ where email = 'root@empresa.com';
 ```
 
 13. Reinicia la sesión de la app. Root podrá asignar `sales`, `operations` o `administrative` desde la pestaña **Usuarios**.
-14. En Authentication → Providers → Email, habilita el registro para que el equipo solicite acceso.
+14. Mantén el registro público deshabilitado hasta completar la migración `23_security_hardening.sql` y asignar el root inicial. Después, en Authentication → Providers → Email, puedes habilitar el registro para que el equipo solicite acceso y quede pendiente de aprobación.
 15. Ejecuta `supabase/15_whatsapp_phase1.sql` para crear el esquema de conversaciones de WhatsApp y sus políticas de lectura por rol.
 16. Ejecuta `supabase/16_whatsapp_bot_api.sql` para activar las operaciones transaccionales y el límite de solicitudes de la API de n8n.
 17. Ejecuta `supabase/17_lead_contact_attempts.sql` para guardar llamadas, WhatsApp, correos y otros intentos de contacto con su fecha/hora.
@@ -28,8 +31,9 @@ where email = 'root@empresa.com';
 20. Ejecuta `supabase/20_lead_client_type.sql` para asegurar la columna de clasificación residencial/empresarial.
 21. Ejecuta `supabase/21_lead_price_adjustments.sql` para guardar precio base, ajuste por m², precio final y diferencia por cotización.
 22. Ejecuta `supabase/22_quote_document_fields.sql` para guardar los datos editables del formato de cotización PDF.
-23. En Supabase → Edge Functions → Secrets agrega `N8N_WEBHOOK_URL` y `N8N_WEBHOOK_SECRET` para que los vendedores puedan enviar WhatsApp desde el CRM.
-24. Local: configura `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, luego ejecuta `npm install` y `npm run dev`. En Vercel configura las mismas variables para los entornos que publiques.
+23. Ejecuta `supabase/23_security_hardening.sql` después de aplicar las migraciones anteriores y antes de habilitar el registro público. En instalaciones existentes, aplícala cuanto antes después de `06`; elimina políticas permisivas heredadas sin borrar las políticas específicas por rol. Si la migración `06` aún no se había aplicado, aplícala primero para restablecer los permisos normales.
+24. En Supabase → Edge Functions → Secrets agrega `N8N_WEBHOOK_URL` y `N8N_WEBHOOK_SECRET` para que los vendedores puedan enviar WhatsApp desde el CRM.
+25. Local: configura `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, luego ejecuta `npm install` y `npm run dev`. En Vercel configura las mismas variables para los entornos que publiques.
 
 En Leads, **Dueño de comisión** conserva el asesor original (`leads.asesor`); **Seguimiento a cargo de** es la persona que dará seguimiento (`leads.followup_assigned_to`). El banner del Dashboard y Leads avisa al dueño original cuando otro vendedor atiende su cliente. La agenda de hoy se agrupa por quien tiene asignado el seguimiento.
 

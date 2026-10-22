@@ -9,12 +9,12 @@ create table if not exists public.profiles (
 
 alter table public.profiles enable row level security;
 
--- Preserve access for existing users without elevating them to administrators.
+-- Existing accounts remain pending until an administrator assigns an approved role.
 insert into public.profiles (id, full_name, area, role)
 select id,
        nullif(raw_user_meta_data->>'full_name', ''),
        nullif(raw_user_meta_data->>'area', ''),
-       'member'
+       null
 from auth.users
 on conflict (id) do nothing;
 
@@ -55,7 +55,8 @@ set search_path = ''
 as $$
   select exists (
     select 1 from public.profiles
-    where id = (select auth.uid()) and role is not null
+    where id = (select auth.uid())
+      and role in ('root','sales','operations','administrative')
   );
 $$;
 
@@ -69,25 +70,19 @@ begin
     if to_regclass(format('public.%I', table_name)) is not null then
       execute format('alter table public.%I enable row level security', table_name);
       execute format('drop policy if exists auth_all on public.%I', table_name);
-      execute format(
-        'create policy auth_all on public.%I for all to authenticated using (public.is_approved_user()) with check (public.is_approved_user())',
-        table_name
-      );
     end if;
   end loop;
 
   if to_regclass('public.lead_audit') is not null then
+    execute 'alter table public.lead_audit enable row level security';
     execute 'drop policy if exists audit_read on public.lead_audit';
     execute 'drop policy if exists audit_ins on public.lead_audit';
-    execute 'create policy audit_read on public.lead_audit for select to authenticated using (public.is_approved_user())';
-    execute 'create policy audit_ins on public.lead_audit for insert to authenticated with check (public.is_approved_user())';
   end if;
 
   if to_regclass('public.inventory_movements') is not null then
+    execute 'alter table public.inventory_movements enable row level security';
     execute 'drop policy if exists mov_read on public.inventory_movements';
     execute 'drop policy if exists mov_ins on public.inventory_movements';
-    execute 'create policy mov_read on public.inventory_movements for select to authenticated using (public.is_approved_user())';
-    execute 'create policy mov_ins on public.inventory_movements for insert to authenticated with check (public.is_approved_user())';
   end if;
 end;
 $$;

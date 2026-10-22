@@ -21,7 +21,7 @@ create table barriles(id uuid primary key default gen_random_uuid(), plaza text 
 do $$ declare t text; begin
  foreach t in array array['leads','bot_inbox','productos','tarifas','visitas','obras','garantias','barriles'] loop
   execute format('alter table %I enable row level security',t);
-  execute format('create policy "auth_all" on %I for all to authenticated using(true) with check(true)',t);
+  execute format('drop policy if exists auth_all on %I',t);
  end loop; end $$;
 insert into productos values('TH FIX','TH FIX','concreto','1000 micras',1),('TH LIGHT','TH LIGHT','concreto','1/2 cm (5 mm)',2),
 ('TH FORTE','TH FORTE','concreto','1 cm (10 mm)',3),('TH 3/4','TH 3/4','inerte','1.9 cm (19 mm)',4),('TH INGLES','TH Inglés','inerte','2.5 cm (25 mm)',5);

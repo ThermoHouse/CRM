@@ -102,3 +102,4 @@ main:has(.lead-table){width:100%;max-width:none}.lead-table{width:100%}.lead-tab
 .quote-specifications p,.quote-observations span{overflow-wrap:anywhere}
 .quote-brand{display:block;width:74mm;height:35.52mm;background-image:url('./assets/thermo-house-logo.png');background-position:left center;background-repeat:no-repeat;background-size:contain}
 .quote-brand>*{display:none!important}
+@media print{.quote-page{height:auto;min-height:0;break-after:auto;page-break-after:auto}.quote-page-one{break-after:page;page-break-after:always}.quote-page-two{break-before:auto;page-break-before:auto}}
