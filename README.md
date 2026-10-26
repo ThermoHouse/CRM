@@ -45,8 +45,8 @@ En las cotizaciones, **Sistema / presentación** usa una sola selección. El aju
 - `root`: todos los módulos, aprobación de usuarios y auditoría.
 - `sales`: dashboard comercial, leads e Inbox; puede consultar precios.
 - `operations`: visitas, instalaciones, mantenimiento e inventario operativo.
-- `administrative`: lectura de todos los módulos; edición de tarifas, productos, inventario, visitas, instalaciones, cierres, finanzas y caja chica.
-- `manager` (gerente): solo ver; Dashboard, Leads, Visitas, Instalaciones, Cierres, Mantenimiento, Inventario, Precios, Finanzas y Reportes. No modifica nada.
+- `administrative`: lectura de todos los módulos; puede crear leads y editar tarifas, productos, inventario, visitas, instalaciones, cierres, finanzas y caja chica. No edita ni elimina leads existentes.
+- `manager` (gerente): consulta y reportes; puede crear leads, pero no editar ni eliminar registros existentes.
 - `sales` solo ve y edita los leads donde es dueño de la comisión o tiene asignado el seguimiento (migración 24).
 
 Los cambios de filas se registran en `public.security_events`, visible solo para root. Los intentos de inicio de sesión fallidos se consultan en Supabase Auth Logs. Los rechazos de políticas RLS y eventos de infraestructura requieren un Log Drain para centralizarlos; no se pueden registrar de forma confiable desde el navegador. La bitácora de la app guarda metadatos, no el contenido completo de los registros.
@@ -113,15 +113,16 @@ Despliega la API autenticada con `supabase functions deploy crm-conversations`. 
 Al cambiar un lead a **Confirmado**, el CRM pide fecha, duración y lugar. Luego crea o actualiza el evento de Google Calendar y notifica al jefe y al vendedor asignado. Los errores del correo dejan la cita guardada y permiten reintentar sin duplicar el evento.
 
 
-## Cierres, finanzas, caja chica y stock por medición (migraciones 24–30)
+## Cierres, finanzas, caja chica y stock por medición (migraciones 24–31)
 Ejecuta en orden, después de `23_security_hardening.sql` y revisando antes cuáles ya están aplicadas:
 
-24. `24_manager_role_and_sales_scope.sql`: rol `manager` (gerente, solo ver) y Ventas limitado a sus propios leads, visitas, obras e historial de contacto. Ventas deja de leer garantías.
+24. `24_manager_role_and_sales_scope.sql`: rol `manager` y Ventas limitado a sus propios leads, visitas, obras e historial de contacto. Ventas deja de leer garantías.
 25. `25_finance_ledger.sql`: categorías libres (fijo/variable), libro de ingresos y egresos y bucket privado `comprobantes` (comprobante opcional).
 26. `26_visits_closings_and_installations.sql`: al pasar un lead a **Visita** se crea la visita; al pasar a **Venta cerrada** se crea un cierre pendiente. Administrativo confirma agenda y anticipo (recibido, perdonado con motivo o pendiente) y **hasta entonces** se crea la obra en Instalaciones. Un anticipo recibido se registra solo como ingreso. Incluye recuperación de leads que ya estaban en esos estados. Administrativo también puede editar Visitas e Instalaciones.
 27. `27_petty_cash.sql`: caja chica y viáticos. Los viáticos y gastos generan solos un egreso en el libro; reposición y devolución no cuentan como gasto.
 28. `28_barrel_level_measurements.sql`: el técnico captura la altura medida con regla (cm) y el sistema calcula litros con la capacidad y altura de cada barril (por defecto 200 L y 100 cm; editables por barril). Mínimos de isocianato y poliol en `stock_minimos` (0 = sin aviso).
 29. `29_supplies_inventory.sql`: EPP, herramientas y consumibles con cantidad y mínimo.
 30. `30_finance_reports.sql`: vista mensual para Reportes y exportación a CSV para el contador.
+31. `31_manager_admin_lead_creation.sql`: permite a Gerente y Administrativo crear leads; no habilita la edición ni eliminación de leads existentes.
 
-Para dar el rol de gerente, root lo asigna desde **Usuarios** (Gerente · solo ver y reportes). No requiere cambios en las Edge Functions ni nuevos secretos.
+Para dar el rol de gerente, root lo asigna desde **Usuarios** (Gerente · consulta y reportes). No requiere cambios en las Edge Functions ni nuevos secretos.

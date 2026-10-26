@@ -25,8 +25,8 @@ Los roles del CRM son:
 | `root` | Todos los módulos; administración de usuarios, plazas y auditoría. |
 | `sales` | Dashboard comercial, Leads, Inbox Bot y Perfil. Solo ve y edita sus propios leads (dueño de comisión o seguimiento asignado). |
 | `operations` | Visitas, Instalaciones, Mantenimiento, Inventario y Perfil. |
-| `administrative` | Consulta de todos los módulos; administra precios, productos, inventario, visitas, instalaciones, cierres, finanzas y caja chica. Leads e Inbox Bot son de solo lectura. |
-| `manager` | Gerente: solo consulta y reportes (sin modificar). |
+| `administrative` | Consulta de todos los módulos; puede crear leads y administra precios, productos, inventario, visitas, instalaciones, cierres, finanzas y caja chica. No edita ni elimina leads existentes. Inbox Bot es de solo lectura. |
+| `manager` | Gerente: consulta y reportes; puede crear leads, pero no editar ni eliminar registros existentes. |
 
 La interfaz oculta los módulos no autorizados y pone en modo de solo lectura las pantallas correspondientes. La seguridad de los datos no depende solo de la interfaz: las migraciones configuran RLS y funciones/políticas en PostgreSQL. El esquema base y la migración de solicitudes de acceso dejan las tablas sin acceso hasta que la migración de roles instale políticas específicas; la migración 23 elimina políticas permisivas heredadas. La asignación de roles se realiza desde **Usuarios** para root. El primer root debe asignarse explícitamente siguiendo las instrucciones del README; el sistema no lo elige automáticamente por ser la única cuenta.
 
@@ -181,7 +181,7 @@ Antes de estimar o implementar un cambio, conviene precisar:
 De esta manera se puede localizar el módulo afectado y distinguir con claridad cambios de interfaz, base de datos e infraestructura.
 
 
-## Cierres, finanzas, stock y reportes (migraciones 24–30)
+## Cierres, finanzas, stock y reportes (migraciones 24–31)
 
 - **Cierres:** al marcar un lead como "Venta cerrada" se crea un cierre pendiente (`cierres`). Administrativo confirma la agenda y el anticipo con `confirm_closing`; entonces se crea la obra en Instalaciones. El anticipo puede quedar recibido, perdonado (con motivo) o pendiente. Marcar "Visita" crea la visita (`visitas`) con el técnico (por defecto, el vendedor).
 - **Finanzas:** `movimientos_financieros` es el libro único de ingresos y egresos, con categorías libres (`finanzas_categorias`, fijo o variable) y comprobante opcional en el bucket privado `comprobantes`. Los anticipos recibidos y los viáticos/gastos de caja chica se registran solos (`origen`).
