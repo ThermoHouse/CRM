@@ -68,6 +68,11 @@ label{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercas
 .panel-feedback,.data-alert{padding:13px 16px;border-radius:12px;background:var(--card);border:1px solid var(--line);color:var(--mut);font-size:13px;margin:0 0 14px}
 .data-alert{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 35%,var(--line))}
 .role-picker{min-width:190px}.audit-table table{min-width:850px}
+.calendar-event-row{display:flex;align-items:center;gap:8px;border-top:1px solid var(--line)}
+.calendar-event-row .calendar-event{flex:1;min-width:0;border-top:0}
+.calendar-event-row .calendar-whatsapp{flex:0 0 auto;padding:7px 10px;white-space:nowrap}
+.calendar-no-phone{flex:0 0 auto;padding:0 8px;font-size:11px;white-space:nowrap}
+@media(max-width:720px){.calendar-layout{grid-template-columns:1fr}.calendar-agenda{padding:16px 0 0;border-left:0;border-top:1px solid var(--line)}.calendar-event-row{gap:4px}.calendar-event-row .calendar-event{gap:7px}.calendar-event-row .calendar-whatsapp{padding:7px}}
 main:has(.lead-table){width:100%;max-width:none}.lead-table{width:100%}.lead-table table{width:100%;min-width:1550px}.lead-followup-row td{background:color-mix(in srgb,var(--or) 7%,var(--card))}.lead-followup-row td:first-child{box-shadow:inset 3px 0 var(--or)}
 @media(max-width:760px){.dashboard-toolbar{grid-template-columns:1fr;align-items:start}.filter-tools{justify-content:flex-start}.lead-toolbar{grid-template-columns:1fr}.lead-main-actions{width:100%}.lead-search{max-width:none}.filter-controls{flex:1}.filter-controls select{flex:1;min-width:0}.sales-performance-heading{align-items:flex-start;flex-direction:column}}
 @media(max-width:800px){.calendar-layout{grid-template-columns:1fr}.calendar-agenda{padding:14px 0 0;border-left:0;border-top:1px solid var(--line)}.calendar-day{min-height:52px}}
