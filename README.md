@@ -113,7 +113,7 @@ Despliega la API autenticada con `supabase functions deploy crm-conversations`. 
 Al cambiar un lead a **Confirmado**, el CRM pide fecha, duración y lugar. Luego crea o actualiza el evento de Google Calendar y notifica al jefe y al vendedor asignado. Los errores del correo dejan la cita guardada y permiten reintentar sin duplicar el evento.
 
 
-## Cierres, finanzas, caja chica y stock por medición (migraciones 24–31)
+## Cierres, finanzas, aplicaciones y mantenimiento (migraciones 24–32)
 Ejecuta en orden, después de `23_security_hardening.sql` y revisando antes cuáles ya están aplicadas:
 
 24. `24_manager_role_and_sales_scope.sql`: rol `manager` y Ventas limitado a sus propios leads, visitas, obras e historial de contacto. Ventas deja de leer garantías.
@@ -124,5 +124,6 @@ Ejecuta en orden, después de `23_security_hardening.sql` y revisando antes cuá
 29. `29_supplies_inventory.sql`: EPP, herramientas y consumibles con cantidad y mínimo.
 30. `30_finance_reports.sql`: vista mensual para Reportes y exportación a CSV para el contador.
 31. `31_manager_admin_lead_creation.sql`: permite a Gerente y Administrativo crear leads; no habilita la edición ni eliminación de leads existentes.
+32. `32_applications_calendar_and_maintenance.sql`: calendario de aplicaciones y mantenimientos recurrentes cada 2, 3 o 4 años. Permite registrar una aplicación desde un lead con venta cerrada o capturar un nuevo cliente.
 
 Para dar el rol de gerente, root lo asigna desde **Usuarios** (Gerente · consulta y reportes). No requiere cambios en las Edge Functions ni nuevos secretos.

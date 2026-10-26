@@ -74,11 +74,11 @@ Administra cliente, ubicación, fecha y estado de la visita. Los usuarios de ope
 
 ### Instalaciones
 
-Administra las aplicaciones/obras: folio, cliente, vendedor, fecha, dirección, metros cuadrados y estado (`por_iniciar`, `en_proceso`, `entregada`). Al completar una obra, puede generarse automáticamente una garantía si está instalada la automatización del blueprint descrita más abajo.
+Muestra las aplicaciones en un calendario con sus fechas de instalación y mantenimiento. Se puede crear una aplicación desde un lead con venta cerrada aún no asociado a una obra, o registrar directamente un nuevo cliente. Cada aplicación con fecha programa su mantenimiento cada 2, 3 o 4 años; la fecha se puede reagendar desde el calendario.
 
 ### Mantenimiento
 
-Gestiona garantías y mantenimientos: cliente, folio, sistema, fecha de instalación, próximo mantenimiento, revisitas y estado. La regla inicial del blueprint calcula el primer mantenimiento a 12 meses de la entrega; ese plazo debe confirmarse frente a la política real de garantía.
+Gestiona garantías y mantenimientos: cliente, folio, sistema, fecha de instalación, próximo mantenimiento, revisitas y estado. Al marcar un mantenimiento como realizado, el sistema registra la fecha y programa el ciclo siguiente con el intervalo de 2, 3 o 4 años configurado en la aplicación.
 
 ### Precios
 
@@ -120,7 +120,7 @@ Los campos detallados de leads y las restricciones evolucionan con las migracion
 
 - **Registro de cambios de estado:** `log_status()` guarda el estado anterior y el nuevo en `lead_audit`. La migración 11 ajusta la función para que el trigger escriba la bitácora de forma segura.
 - **Leads por rescatar:** `marcar_rescatar(dias)` cambia leads nuevos o contactados cuya marca `last_contact_at` supera el umbral al estado `rescatar`; el valor predeterminado es 15 días. La función SQL no programa su propia ejecución diaria: hace falta configurarla con pg_cron u otro proceso (por ejemplo, una Edge Function).
-- **Garantía tras entrega:** `obra_entregada()` crea una garantía cuando una obra pasa a `entregada`, con primer mantenimiento a 12 meses. Esta regla proviene de `supabase/04_blueprint.sql` y requiere que ese script se haya aplicado; revisar el plazo de garantía antes de usarlo.
+- **Mantenimiento de aplicaciones:** `32_applications_calendar_and_maintenance.sql` crea o actualiza una agenda de mantenimiento al registrar una aplicación fechada. Al marcarla como realizada, registra la fecha y programa el ciclo siguiente según el intervalo configurado.
 - **Cita para lead confirmado:** la aplicación solicita los datos de agenda y la Edge Function `schedule-confirmed-lead` puede crear/actualizar un evento de Google Calendar y enviar avisos. Requiere configuración OAuth, secretos y despliegue.
 - **Sincronización de visitas:** la función `complete_visit` y los triggers definidos por las migraciones mantienen el estado de finalización en la base de datos.
 
@@ -181,9 +181,10 @@ Antes de estimar o implementar un cambio, conviene precisar:
 De esta manera se puede localizar el módulo afectado y distinguir con claridad cambios de interfaz, base de datos e infraestructura.
 
 
-## Cierres, finanzas, stock y reportes (migraciones 24–31)
+## Cierres, finanzas, stock y reportes (migraciones 24–32)
 
 - **Cierres:** al marcar un lead como "Venta cerrada" se crea un cierre pendiente (`cierres`). Administrativo confirma la agenda y el anticipo con `confirm_closing`; entonces se crea la obra en Instalaciones. El anticipo puede quedar recibido, perdonado (con motivo) o pendiente. Marcar "Visita" crea la visita (`visitas`) con el técnico (por defecto, el vendedor).
+- **Aplicaciones y mantenimiento:** la migración 32 habilita registrar una aplicación desde un lead cerrado disponible o como nuevo cliente. La fecha aparece en el calendario y genera una agenda de mantenimiento recurrente cada 2, 3 o 4 años. Si se registra desde Instalaciones un lead que tenía un cierre pendiente, ese cierre se marca como cancelado para evitar generar una aplicación duplicada.
 - **Finanzas:** `movimientos_financieros` es el libro único de ingresos y egresos, con categorías libres (`finanzas_categorias`, fijo o variable) y comprobante opcional en el bucket privado `comprobantes`. Los anticipos recibidos y los viáticos/gastos de caja chica se registran solos (`origen`).
 - **Caja chica:** `caja_chica_movimientos` (reposición, viático, gasto, devolución). El saldo sale de la vista `caja_chica_saldo`. Solo se inserta; root puede borrar y el egreso del libro se retira solo.
 - **Stock por medición:** `barril_mediciones` guarda la altura medida con regla y los litros calculados; `barriles` conserva el último nivel. `stock_resumen` suma litros por material y `stock_minimos` define cuándo avisar.
