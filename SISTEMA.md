@@ -86,9 +86,9 @@ Administra productos, presentaciones y tarifas por ciudad, incluyendo precio de 
 
 ### Inventario
 
-La pantalla operativa actual administra barriles por plaza, tipo de material (isocianato o poliol), lote, estado y fecha de entrada.
+La pantalla operativa administra barriles por plaza, material (isocianato o resina/poliol), lote, estado, capacidad y altura. El formulario registra consumo en centímetros y calcula los litros consumidos y restantes; cada operación queda en el historial y actualiza la gráfica de existencias por químico. El mínimo configurado muestra una alerta cuando conviene comprar. Requiere la migración 33.
 
-El blueprint SQL también define `inventory_movements`, un registro de entradas/consumos de solo inserción y lectura para usuarios autenticados. Es un registro separado del CRUD de barriles; no debe asumirse que ambos inventarios se concilian o se actualizan automáticamente.
+`inventory_movements` es un registro independiente y no se concilia automáticamente con los barriles. Los consumos registrados desde el formulario de barriles se guardan en `barril_consumos` y aplican el descuento al nivel del barril.
 
 ### Usuarios, auditoría y perfil
 
@@ -181,7 +181,7 @@ Antes de estimar o implementar un cambio, conviene precisar:
 De esta manera se puede localizar el módulo afectado y distinguir con claridad cambios de interfaz, base de datos e infraestructura.
 
 
-## Cierres, finanzas, stock y reportes (migraciones 24–32)
+## Cierres, finanzas, stock y reportes (migraciones 24–33)
 
 - **Cierres:** al marcar un lead como "Venta cerrada" se crea un cierre pendiente (`cierres`). Administrativo confirma la agenda y el anticipo con `confirm_closing`; entonces se crea la obra en Instalaciones. El anticipo puede quedar recibido, perdonado (con motivo) o pendiente. Marcar "Visita" crea la visita (`visitas`) con el técnico (por defecto, el vendedor).
 - **Aplicaciones y mantenimiento:** la migración 32 habilita registrar una aplicación desde un lead cerrado disponible o como nuevo cliente. La fecha aparece en el calendario y genera una agenda de mantenimiento recurrente cada 2, 3 o 4 años. Si se registra desde Instalaciones un lead que tenía un cierre pendiente, ese cierre se marca como cancelado para evitar generar una aplicación duplicada.
