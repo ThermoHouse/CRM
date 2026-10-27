@@ -23,7 +23,7 @@ Los roles del CRM son:
 | Rol | Acceso funcional |
 |---|---|
 | `root` | Todos los módulos; administración de usuarios, plazas y auditoría. |
-| `sales` | Dashboard comercial, Leads, Inbox Bot y Perfil. Solo ve y edita sus propios leads (dueño de comisión o seguimiento asignado). |
+| `sales` | Dashboard comercial, Leads, Desglose, Inbox Bot y Perfil. Solo ve y edita sus propios leads (dueño de comisión o seguimiento asignado). |
 | `operations` | Visitas, Instalaciones, Mantenimiento, Inventario y Perfil. |
 | `administrative` | Consulta de todos los módulos; puede crear leads y administra precios, productos, inventario, visitas, instalaciones, cierres, finanzas y caja chica. No edita ni elimina leads existentes. Inbox Bot es de solo lectura. |
 | `manager` | Gerente: consulta y reportes; puede crear leads, pero no editar ni eliminar registros existentes. |
@@ -61,6 +61,16 @@ Otras acciones relacionadas incluyen:
 - Filtrar por tipo de cliente, asesor, plaza, zona y periodo.
 - Seleccionar y eliminar varios leads donde el rol lo permita.
 - Abrir WhatsApp para contactar al cliente.
+
+### Desglose de servicios profesionales
+
+Pestaña **Desglose** (roles `root`, `sales`, `administrative` y `manager`; también se abre desde el botón **Desglose** de cada fila en Leads). Formulario interactivo que genera el documento "Descripción detallada del servicio" para el cliente, como complemento de la cotización o de forma independiente.
+
+- Se puede **vincular un cliente existente** (carga nombre, domicilio, folio, m², tipo de superficie, tono, condiciones del techo, objetos y montos de la cotización) o **capturar todo manualmente**. Los datos que no existen en el lead se llenan en el formulario; los pendientes se resaltan y se cuentan.
+- La vista previa es el mismo documento que se descarga en **PDF** (A4, logo de ThermoHouse y número de página en cada hoja). Los datos sin llenar salen como línea en blanco.
+- Calcula subtotal, IVA, total, anticipo del 50 %, total de horas y días en sitio. No modifica el lead.
+- **Guardar** usa la tabla `service_breakdowns` (migración 34, opcional). El borrador se conserva en la sesión del navegador al cambiar de pestaña.
+- Archivos: `src/ServiceBreakdown.jsx`, `src/breakdownPdf.js`, `supabase/34_service_breakdowns.sql`.
 
 ### Inbox Bot
 

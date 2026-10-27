@@ -142,3 +142,48 @@ main:has(.lead-table){width:100%;max-width:none}.lead-table{width:100%}.lead-tab
 .applications-page{display:grid;gap:14px}.applications-heading,.applications-calendar-header{display:flex;align-items:center;justify-content:space-between;gap:14px}.applications-heading h2,.applications-calendar-header h3{margin:4px 0}.applications-heading p{margin:4px 0 0}.applications-calendar{padding:18px;background:var(--card);border:1px solid var(--line);border-radius:16px}.applications-calendar-layout{display:grid;grid-template-columns:minmax(300px,1.1fr) minmax(280px,.9fr);gap:20px}.applications-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}.applications-agenda{min-width:0;padding-left:18px;border-left:1px solid var(--line)}.application-calendar-event{display:grid;justify-items:start;gap:5px;padding:12px 4px;border-top:1px solid var(--line)}.application-calendar-event strong,.application-calendar-event small{max-width:100%;overflow-wrap:anywhere}.application-calendar-event small{color:var(--mut);font-size:11px}.application-event-tag{color:var(--or);font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}.maintenance-event .application-event-tag{color:var(--info)}.application-event-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}.application-event-actions .btn,.application-calendar-event>.btn{font-size:11px;padding:7px 10px}.applications-legend{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:14px;color:var(--mut);font-size:11px}.applications-legend span{display:inline-flex;align-items:center;gap:6px}.applications-legend span:last-child{margin-left:auto}.applications-legend i{width:9px;height:9px;border-radius:50%;background:var(--or)}.applications-legend .maintenance-dot{background:var(--info)}.application-form{display:grid;gap:9px;width:min(620px,100%)}.application-form h3{margin:3px 0 0}.application-form>p{margin:0}.application-form label{margin:2px 0 0}.application-form .row{margin:3px 0 0}.application-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.application-fields>div{min-width:0}.application-lead-summary{display:grid;gap:4px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card2);font-size:12px;overflow-wrap:anywhere}.application-lead-summary span{color:var(--mut)}
 @media(max-width:800px){.applications-calendar-layout{grid-template-columns:1fr}.applications-agenda{padding:14px 0 0;border-left:0;border-top:1px solid var(--line)}}
 @media(max-width:520px){.applications-heading{align-items:flex-start;flex-direction:column}.applications-heading>.btn{width:100%}.applications-calendar{padding:13px}.applications-calendar-header{align-items:flex-start}.applications-calendar-grid{gap:3px}.applications-calendar-grid .calendar-day{min-height:44px;padding:5px}.application-fields{grid-template-columns:1fr}.applications-legend{gap:9px}.applications-legend span:last-child{margin-left:0}}
+
+/* ---------- Desglose de servicios profesionales ---------- */
+.sb-page{display:grid;gap:14px}
+.sb-intro{margin:0 0 14px;font-size:13px;line-height:1.5}
+.sb-group{margin:0 0 14px;padding:14px;border:1px solid var(--line);border-radius:14px;min-width:0}
+.sb-group legend{padding:0 8px;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--or)}
+.sb-group .lead-view-toggle{flex-wrap:wrap}
+.sb-lead-picker{margin-bottom:12px}
+.sb-inline-check{display:flex;align-items:center;gap:8px;margin:0;text-transform:none;letter-spacing:0;font-size:13px;color:var(--tx);cursor:pointer}
+.sb-inline-check input{width:auto}
+input.sb-pending,select.sb-pending{border-color:color-mix(in srgb,var(--or) 70%,var(--line));background:color-mix(in srgb,var(--or) 7%,var(--inp))}
+.sb-link{padding:0;border:0;background:none;color:var(--or);font-size:11px;font-weight:700;cursor:pointer;text-decoration:underline}
+.sb-link:disabled{color:var(--mut);cursor:default;text-decoration:none}
+.sb-pending-list{margin:12px 0 0;padding:10px 12px;border:1px solid color-mix(in srgb,var(--or) 36%,var(--line));border-radius:10px;font-size:12px;color:var(--mut)}
+.sb-pending-list summary{cursor:pointer;font-weight:700;color:var(--tx)}
+.sb-pending-list ul{margin:8px 0 0;padding-left:18px;columns:2}
+.sb-actions{position:sticky;top:0;z-index:2;padding:8px 0;background:var(--card)}
+.sb-preview-scroll{overflow:auto;padding:8px;background:var(--card2);border-radius:12px}
+.sb-saved table{width:100%}
+
+/* Documento (hoja blanca, igual en tema claro u oscuro y en el PDF) */
+.sb-doc{width:210mm;max-width:none;margin:0 auto;padding:14mm 14mm 12mm;background:#fff;color:#111;font:10.5pt/1.5 Helvetica,Arial,sans-serif;box-shadow:0 2px 14px #0003}
+.sb-doc *{box-sizing:border-box}
+.sb-doc-head{display:flex;align-items:center;gap:16px;padding-bottom:10px;border-bottom:2px solid #f58220;margin-bottom:12px}
+.sb-doc-logo{width:42mm;height:auto;display:block}
+.sb-doc-head h1{margin:0;font-size:17pt;letter-spacing:0;color:#111;font-weight:800}
+.sb-doc-head p{margin:2px 0 0;font-size:9.5pt;color:#555}
+.sb-doc h2{margin:0 0 6px;padding-bottom:3px;border-bottom:1px solid #d9d9d9;font-size:12.5pt;color:#0872ba;font-weight:800}
+.sb-doc h3{margin:8px 0 3px;font-size:10.5pt;color:#111;font-weight:800}
+.sb-doc p{margin:0 0 6px;text-align:justify}
+.sb-doc ul,.sb-doc ol{margin:0 0 6px;padding-left:20px}
+.sb-doc li{margin-bottom:3px}
+.sb-section{margin:0 0 14px}
+.sb-meta{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;margin-bottom:14px;padding:8px 10px;background:#f6f8fb;border:1px solid #e1e6ee;border-radius:4px;font-size:10pt}
+.sb-meta-wide{grid-column:1/-1}
+.sb-table{width:100%;margin:6px 0 8px;border-collapse:collapse;font-size:10pt}
+.sb-table th,.sb-table td{padding:5px 8px;border:1px solid #cfd6e0;text-align:left}
+.sb-table th{background:#0872ba;color:#fff;font-weight:700}
+.sb-table td:last-child,.sb-table th:last-child{text-align:right;white-space:nowrap}
+.sb-table .sb-strong td{background:#fff3e8;font-weight:800}
+.sb-blank{display:inline-block;min-width:34px;height:1em;border-bottom:1px solid #111;vertical-align:baseline}
+.sb-doc:not(.sb-pdf) .sb-blank{background:#fff3cd;border-bottom-color:#e0a100}
+.sb-pdf{box-shadow:none}
+.sb-pdf .sb-doc-head,.sb-pdf .sb-doc-logo{display:none}
+@media(max-width:600px){.sb-pending-list ul{columns:1}.quote-price-summary{grid-template-columns:repeat(3,minmax(0,1fr))}}

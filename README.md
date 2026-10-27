@@ -126,5 +126,6 @@ Ejecuta en orden, después de `23_security_hardening.sql` y revisando antes cuá
 31. `31_manager_admin_lead_creation.sql`: permite a Gerente y Administrativo crear leads; no habilita la edición ni eliminación de leads existentes.
 32. `32_applications_calendar_and_maintenance.sql`: calendario de aplicaciones y mantenimientos recurrentes cada 2, 3 o 4 años. Permite registrar una aplicación desde un lead con venta cerrada o capturar un nuevo cliente.
 33. `33_chemical_consumption_by_height.sql`: formulario de salidas de isocianato y resina por centímetros consumidos, historial y actualización automática de litros restantes y gráfica de mínimos de compra.
+34. `34_service_breakdowns.sql`: tabla `service_breakdowns` para guardar los "Desgloses de servicios profesionales" (pestaña **Desglose**, roles `root`, `sales`, `administrative` y `manager`). Es opcional: el formulario y el PDF funcionan sin ella; solo habilita Guardar y la lista de guardados. Ventas ve solo los suyos; root, administrativo y gerente ven todos.
 
 Para dar el rol de gerente, root lo asigna desde **Usuarios** (Gerente · consulta y reportes). No requiere cambios en las Edge Functions ni nuevos secretos.
