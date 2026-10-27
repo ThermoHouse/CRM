@@ -56,6 +56,7 @@ const blankForm = () => ({
 const PRESENTATION_ALIASES = {FIX: 'TH FIX', LIGHT: 'TH LIGHT', LITE: 'TH LIGHT', FORTE: 'TH FORTE', '3/4': 'TH 3/4', INGLES: 'TH INGLES', 'INGLÉS': 'TH INGLES'};
 const FALLBACK_PRODUCTS = [['TH FIX', '1000 micras'], ['TH LIGHT', '1/2 cm (5 mm)'], ['TH FORTE', '1 cm (10 mm)'], ['TH 3/4', '1.9 cm (19 mm)'], ['TH INGLES', '2.5 cm (25 mm)']]
   .map(([id, espesor], orden) => ({id, nombre: id, espesor, orden}));
+const PRESENTATION_THICKNESS = {'TH LIGHT': '1/2 cm (5 mm)', 'TH FORTE': '1 cm (10 mm)', 'TH 3/4': '3/4 de pulgada (19 mm)', 'TH INGLES': '1 pulgada (25 mm)', 'TH FIX': 'Solo impermeabilizante acrílico'};
 /** Lleva "Forte", "TH LITE", "lite", etc. al id real de la tabla productos. */
 const normalizePresentation = value => {
   const up = String(value || '').trim().toUpperCase().replace(/\s+/g, ' ');
@@ -110,12 +111,24 @@ function fromLead(l, extra = {}) {
   const viaticos = num(l.costo_logistico);
   const subtotal = num(hasSnapshot ? l.subtotal : l.total);
   const byUnit = num(l.precio_final_m2) * num(l.area_m2);
-  const aplicacion = subtotal > 0 ? Math.max(0, subtotal - destechado - viaticos) : byUnit > 0 ? byUnit : '';
+  const presentationLines = Array.isArray(l.presentaciones) ? l.presentaciones.filter(line => line.sistema) : [];
+  const primaryPresentation = presentationLines[0];
+  const aplicacion = primaryPresentation
+    ? num(primaryPresentation.monto) || num(primaryPresentation.precio_final_m2) * num(primaryPresentation.area_m2)
+    : subtotal > 0 ? Math.max(0, subtotal - destechado - viaticos) : byUnit > 0 ? byUnit : '';
   const conditions = Array.isArray(l.condiciones_techo) ? l.condiciones_techo : [];
   const supplies = (Array.isArray(l.suministros) ? l.suministros : []).map(v => String(v).toLowerCase());
   const volt = String(l.voltaje || '');
   const power = /220/.test(volt) || supplies.includes('220v') ? 'si' : /1[12][0-9]|\b110\b|\b127\b/.test(volt) ? 'no' : '';
-  const area = num(l.area_m2) > 0 ? l.area_m2 : num(extra.obra?.m2) > 0 ? extra.obra.m2 : '';
+  const area = primaryPresentation?.area_m2 ?? (num(l.area_m2) > 0 ? l.area_m2 : num(extra.obra?.m2) > 0 ? extra.obra.m2 : '');
+  const works = presentationLines.slice(1).map((line, index) => ({
+    id: `lead-work-${line.id || index}`,
+    sistema: normalizePresentation(line.sistema),
+    superficie_m2: line.area_m2 ?? '',
+    espesor: PRESENTATION_THICKNESS[normalizePresentation(line.sistema)] || '',
+    tono: line.tono_acrilico || l.tono_acrilico || '',
+    monto_aplicacion: num(line.monto) || num(line.precio_final_m2) * num(line.area_m2),
+  }));
   const dateSource = l.fecha_presupuesto || l.created_at;
   const out = {
     cliente: l.nombre || '',
@@ -129,12 +142,13 @@ function fromLead(l, extra = {}) {
     ]),
     fecha: dateSource ? String(dateSource).slice(0, 10) : '',
     folio: l.folio || '',
-    sistema: normalizePresentation(l.sistema || l.presentacion),
+    sistema: normalizePresentation(l.sistema || l.presentacion || primaryPresentation?.sistema),
+    trabajos: works,
     superficie_m2: area,
     superficies: Array.isArray(l.aplicaciones) ? l.aplicaciones : [],
     condiciones: conditions,
     objetos: Array.isArray(l.objetos_techo) ? l.objetos_techo : [],
-    tono: l.tono_acrilico || '',
+    tono: primaryPresentation?.tono_acrilico || l.tono_acrilico || '',
     power_220: power,
     descuento: l.descuento || '',
     monto_destechado: destechado > 0 ? destechado : '',
