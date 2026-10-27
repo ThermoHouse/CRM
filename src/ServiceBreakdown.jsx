@@ -37,7 +37,7 @@ const joinEs = items => {
 
 const blankForm = () => ({
   lead_id: null,
-  cliente: '', domicilio: '', fecha: today(), folio: '', sistema: '',
+  cliente: '', telefono: '', email: '', domicilio: '', fecha: today(), folio: '', sistema: '',
   superficie_m2: '', superficies: [],
   condiciones: [], objetos: [],
   destechado_incluye: true, destechado_m2: '', destechado_destino: 'sitio',
@@ -46,37 +46,104 @@ const blankForm = () => ({
   espesor: '', tono: '',
   h_destechado: '', h_punteado: '', h_aplicacion: '', h_acrilico: '', jornada: 8,
   aplicadores: '', ayudantes: '', supervisores: 1, fecha_inicio: '',
-  monto_aplicacion: '', monto_agregados: 0, agregados_detalle: '', iva_aplica: true,
+  monto_aplicacion: '', monto_destechado: '', monto_viaticos: '', monto_otros: '', concepto_otros: '', descuento: '', iva_aplica: true,
   notas: '',
 });
 
-/** Datos del lead que alimentan el desglose. Solo devuelve lo que el lead sí tiene. */
-function fromLead(l) {
+const PRESENTATION_ALIASES = {FIX: 'TH FIX', LIGHT: 'TH LIGHT', LITE: 'TH LIGHT', FORTE: 'TH FORTE', '3/4': 'TH 3/4', INGLES: 'TH INGLES', 'INGLÉS': 'TH INGLES'};
+const FALLBACK_PRODUCTS = [['TH FIX', '1000 micras'], ['TH LIGHT', '1/2 cm (5 mm)'], ['TH FORTE', '1 cm (10 mm)'], ['TH 3/4', '1.9 cm (19 mm)'], ['TH INGLES', '2.5 cm (25 mm)']]
+  .map(([id, espesor], orden) => ({id, nombre: id, espesor, orden}));
+/** Lleva "Forte", "TH LITE", "lite", etc. al id real de la tabla productos. */
+const normalizePresentation = value => {
+  const up = String(value || '').trim().toUpperCase().replace(/\s+/g, ' ');
+  if (!up) return '';
+  const bare = up.replace(/^TH\s+/, '');
+  return PRESENTATION_ALIASES[bare] || (/^TH\s/.test(up) ? up : String(value).trim());
+};
+const presentationLabel = p => `${p.id === 'TH LIGHT' ? 'TH LITE' : p.nombre || p.id}${p.espesor ? ` · ${p.espesor}` : ''}`;
+
+/** Formularios guardados con la versión anterior (un solo monto de "agregados"). */
+function migrateForm(data) {
+  const d = {...(data || {})};
+  if (d.monto_agregados != null && d.monto_destechado == null && d.monto_viaticos == null && d.monto_otros == null) {
+    if (num(d.monto_agregados) > 0) { d.monto_otros = d.monto_agregados; d.concepto_otros = d.agregados_detalle || ''; }
+  }
+  delete d.monto_agregados; delete d.agregados_detalle;
+  return {...blankForm(), ...d};
+}
+
+const joinParts = parts => parts.filter(p => !empty(p)).join(', ');
+
+/**
+ * Datos del lead (y, si existen, de su obra / cierre) que alimentan el desglose.
+ * Solo devuelve lo que el cliente sí tiene, para no borrar lo ya capturado.
+ *
+ *  lead.nombre ................. cliente            lead.whatsapp ............ telefono
+ *  lead.email .................. email              lead.direccion+cp+ciudad+estado → domicilio
+ *  lead.folio .................. folio              lead.fecha_presupuesto|created_at → fecha
+ *  lead.sistema|presentacion ... sistema (productos) lead.area_m2|obra.m2 .... superficie_m2
+ *  lead.aplicaciones ........... superficies        lead.tono_acrilico ....... tono
+ *  lead.condiciones_techo ...... condiciones        lead.objetos_techo ....... objetos
+ *  lead.voltaje|suministros .... power_220          lead.destechado_monto .... monto_destechado
+ *  lead.costo_logistico ........ monto_viaticos     lead.subtotal/total/iva .. monto_aplicacion, iva_aplica
+ *  lead.descuento .............. descuento          obra.programacion|cierre.fecha_instalacion → fecha_inicio
+ */
+function fromLead(l, extra = {}) {
   const hasSnapshot = l.subtotal != null && l.iva != null;
-  const extras = num(l.costo_logistico) + num(l.destechado_monto);
+  const destechado = num(l.destechado_monto);
+  const viaticos = num(l.costo_logistico);
   const subtotal = num(hasSnapshot ? l.subtotal : l.total);
-  const extraParts = [];
-  if (num(l.destechado_monto) > 0) extraParts.push(`Destechado (${money(l.destechado_monto)})`);
-  if (num(l.costo_logistico) > 0) extraParts.push(`Viáticos / distancia (${money(l.costo_logistico)})`);
+  const byUnit = num(l.precio_final_m2) * num(l.area_m2);
+  const aplicacion = subtotal > 0 ? Math.max(0, subtotal - destechado - viaticos) : byUnit > 0 ? byUnit : '';
+  const conditions = Array.isArray(l.condiciones_techo) ? l.condiciones_techo : [];
+  const supplies = (Array.isArray(l.suministros) ? l.suministros : []).map(v => String(v).toLowerCase());
+  const volt = String(l.voltaje || '');
+  const power = /220/.test(volt) || supplies.includes('220v') ? 'si' : /1[12][0-9]|\b110\b|\b127\b/.test(volt) ? 'no' : '';
+  const area = num(l.area_m2) > 0 ? l.area_m2 : num(extra.obra?.m2) > 0 ? extra.obra.m2 : '';
+  const dateSource = l.fecha_presupuesto || l.created_at;
   const out = {
     cliente: l.nombre || '',
-    domicilio: [l.direccion, l.ciudad].filter(Boolean).join(', '),
-    fecha: l.fecha_presupuesto ? String(l.fecha_presupuesto).slice(0, 10) : '',
+    telefono: l.whatsapp || '',
+    email: l.email || '',
+    domicilio: joinParts([
+      l.direccion || extra.cierre?.direccion || extra.obra?.direccion || l.appointment_location,
+      l.cp ? `C.P. ${l.cp}` : '',
+      l.ciudad,
+      l.estado && !String(l.ciudad || '').includes(l.estado) ? l.estado : '',
+    ]),
+    fecha: dateSource ? String(dateSource).slice(0, 10) : '',
     folio: l.folio || '',
-    sistema: l.sistema || l.presentacion || '',
-    superficie_m2: num(l.area_m2) > 0 ? l.area_m2 : '',
+    sistema: normalizePresentation(l.sistema || l.presentacion),
+    superficie_m2: area,
     superficies: Array.isArray(l.aplicaciones) ? l.aplicaciones : [],
-    condiciones: Array.isArray(l.condiciones_techo) ? l.condiciones_techo : [],
+    condiciones: conditions,
     objetos: Array.isArray(l.objetos_techo) ? l.objetos_techo : [],
     tono: l.tono_acrilico || '',
-    espesor: /FORTE/i.test(l.sistema || l.presentacion || '') ? 'menor de 1 cm (presentación Forte)' : '',
-    power_220: /220/.test(String(l.voltaje || '')) ? 'si' : '',
-    monto_aplicacion: subtotal > 0 ? Math.max(0, subtotal - extras) : '',
-    monto_agregados: extras,
-    agregados_detalle: extraParts.join(', '),
-    iva_aplica: l.iva_aplica != null ? Boolean(l.iva_aplica) : hasSnapshot ? num(l.iva) > 0 : true,
+    power_220: power,
+    descuento: l.descuento || '',
+    monto_destechado: destechado > 0 ? destechado : '',
+    monto_viaticos: viaticos > 0 ? viaticos : '',
+    monto_aplicacion: aplicacion,
+    fecha_inicio: String(extra.obra?.programacion || extra.cierre?.fecha_instalacion || '').slice(0, 10),
   };
-  return Object.fromEntries(Object.entries(out).filter(([, v]) => !empty(v)));
+  // Hay destechado si se cobra o si el techo tiene impermeabilizante anterior / desgaste.
+  if (destechado > 0 || conditions.some(c => /impermeabilizante|desgaste/i.test(c))) out.destechado_incluye = true;
+  if (l.iva_aplica != null || hasSnapshot) out.iva_aplica = l.iva_aplica != null ? Boolean(l.iva_aplica) : num(l.iva) > 0;
+  return Object.fromEntries(Object.entries(out).filter(([k, v]) => k === 'iva_aplica' || k === 'destechado_incluye' || !empty(v)));
+}
+
+/** Obra y cierre del cliente (fecha de instalación, m²). Es opcional: si el rol no puede leerlos, se ignora. */
+async function fetchLeadExtras(id) {
+  const extra = {};
+  try {
+    const {data, error} = await sb.from('obras').select('programacion,m2,direccion,status').eq('lead_id', id).limit(5);
+    if (!error && data?.length) extra.obra = data.find(o => o.status !== 'cancelada') || data[0];
+  } catch { /* sin acceso */ }
+  try {
+    const {data, error} = await sb.from('cierres').select('fecha_instalacion,direccion,status').eq('lead_id', id).neq('status', 'cancelado').limit(1);
+    if (!error && data?.length) extra.cierre = data[0];
+  } catch { /* sin acceso */ }
+  return extra;
 }
 
 /** Campos que todavía faltan para que el documento quede completo. */
@@ -87,6 +154,7 @@ function pendingFields(f) {
   need('Domicilio', f.domicilio);
   need('Fecha', f.fecha);
   need('Folio de presupuesto', f.folio);
+  need('Presentación / sistema', f.sistema);
   need('Superficie (m²)', f.superficie_m2);
   need('Tipo de superficie', f.superficies);
   if (f.destechado_incluye) need('Superficie de destechado (m²)', f.destechado_m2);
@@ -113,11 +181,11 @@ function pendingFields(f) {
 
 /* ---------- Piezas de formulario (fuera del componente para no perder el foco) ---------- */
 
-function Field({label, value, onChange, type = 'text', required = false, hint, wide = false, children, ...rest}) {
+function Field({label, value, onChange, type = 'text', required = false, hint, wide = false, from = false, children, ...rest}) {
   const missing = required && empty(value);
   return (
     <div className={wide ? 'w' : undefined}>
-      <label>{label}</label>
+      <label>{label}{from && <span className="sb-from" title="Dato tomado del cliente vinculado">del cliente</span>}</label>
       {children || <input type={type} value={value ?? ''} onChange={onChange} className={missing ? 'sb-pending' : undefined} {...rest} />}
       {hint && <small className="field-hint">{hint}</small>}
     </div>
@@ -149,7 +217,9 @@ function CheckGroup({label, options, selected = [], onChange}) {
 const Blank = () => <span className="sb-blank" aria-label="por completar" />;
 const val = (v, suffix = '') => (empty(v) ? <Blank /> : <>{typeof v === 'number' ? v.toLocaleString('es-MX') : v}{suffix}</>);
 
-function BreakdownDocument({f, totals, docRef}) {
+function BreakdownDocument({f, totals, docRef, productos}) {
+  const product = productos.find(p => p.id === f.sistema);
+  const presentation = product ? (product.id === 'TH LIGHT' ? 'TH LITE' : product.nombre || product.id) : f.sistema;
   const surfaces = f.superficies.length ? joinEs(f.superficies) : null;
   const toneText = f.tono === 'No aplica' ? 'sin tono específico' : f.tono ? f.tono.toLowerCase() : null;
   const connection = f.conexion_temporal === 'medidor'
@@ -173,7 +243,8 @@ function BreakdownDocument({f, totals, docRef}) {
         <div><b>Presupuesto:</b> {val(f.folio)}</div>
         <div className="sb-meta-wide"><b>Domicilio:</b> {val(f.domicilio)}</div>
         <div><b>Fecha:</b> {showDate(f.fecha) || <Blank />}</div>
-        {f.sistema && <div><b>Presentación:</b> {f.sistema}</div>}
+        {(f.telefono || f.email) && <div><b>Contacto:</b> {[f.telefono, f.email].filter(Boolean).join(' · ')}</div>}
+        {presentation && <div><b>Presentación:</b> {presentation}</div>}
       </div>
 
       <section className="sb-section sb-avoid">
@@ -271,7 +342,7 @@ function BreakdownDocument({f, totals, docRef}) {
             <li><b>Calibración y prueba:</b> se calibra la máquina antes de cada trabajo y se hace una prueba de aplicación para verificar la calidad del material.</li>
             <li>
               <b>Aplicación del poliuretano:</b> el personal, con traje y mascarilla, aplica la espuma de poliuretano
-              espreado (isocianato + poliol) en capas uniformes hasta alcanzar el espesor acordado ({val(f.espesor)}).
+              espreado (isocianato + poliol) en capas uniformes hasta alcanzar el espesor acordado: {val(f.espesor)}.
             </li>
           </ol>
         </div>
@@ -311,10 +382,11 @@ function BreakdownDocument({f, totals, docRef}) {
           El presupuesto cubre únicamente el suministro y la aplicación de espuma de poliuretano espreado con
           recubrimiento acrílico, incluyendo mano de obra y material, sobre la superficie indicada.{' '}
           {totals.extras > 0 ? (
-            <>El presupuesto incluye agregados por <b>{money(totals.extras)}</b>{f.agregados_detalle ? ` (${f.agregados_detalle})` : ''}. </>
+            <>El presupuesto incluye agregados por <b>{money(totals.extras)}</b> ({totals.extraParts.join(', ')}). </>
           ) : (
             <b>El presupuesto se presenta sin agregados. </b>
           )}
+          {f.descuento && <>Descuento aplicado: {f.descuento}. </>}
           Cualquier trabajo adicional, como destechado, reparaciones, tratamiento de grietas, retiro de escombro,
           distancia o maniobras especiales, se cotiza por separado y se suma al total solo con autorización del cliente.
         </p>
@@ -360,7 +432,7 @@ const loadDraft = () => {
     const raw = sessionStorage.getItem(DRAFT_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return {form: {...blankForm(), ...parsed.form}, savedId: parsed.savedId || null, mode: parsed.mode || 'manual'};
+    return {form: migrateForm(parsed.form), savedId: parsed.savedId || null, mode: parsed.mode || 'manual'};
   } catch { return null; }
 };
 
@@ -369,6 +441,9 @@ export default function ServiceBreakdown({initialLead = null}) {
   const [f, setF] = useState(() => draft?.form || {...blankForm(), ...(initialLead ? {lead_id: initialLead.id, ...fromLead(initialLead)} : {})});
   const [mode, setMode] = useState(() => (initialLead ? 'lead' : draft?.mode || 'lead'));
   const [savedId, setSavedId] = useState(draft?.savedId || null);
+  const [productos, setProductos] = useState(FALLBACK_PRODUCTS);
+  const [linked, setLinked] = useState(() => (initialLead ? Object.keys(fromLead(initialLead)) : []));
+  const [extrasNote, setExtrasNote] = useState('');
   const [leads, setLeads] = useState([]);
   const [leadsState, setLeadsState] = useState({loading: true, error: ''});
   const [search, setSearch] = useState('');
@@ -380,6 +455,7 @@ export default function ServiceBreakdown({initialLead = null}) {
   const docRef = useRef(null);
 
   const set = k => e => setF(c => ({...c, [k]: e.target.value}));
+  const L = k => linked.includes(k);
   const setV = (k, v) => setF(c => ({...c, [k]: v}));
 
   // Conserva el borrador al cambiar de pestaña (solo en esta sesión del navegador).
@@ -396,6 +472,38 @@ export default function ServiceBreakdown({initialLead = null}) {
     });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    sb.from('productos').select('id,nombre,espesor,orden').order('orden', {ascending: true}).then(({data, error}) => {
+      if (active && !error && data?.length) setProductos(data);
+    });
+    return () => { active = false; };
+  }, []);
+
+  // Al abrir desde Leads, completa con la obra / cierre del cliente (fecha de instalación, m²).
+  useEffect(() => {
+    if (!initialLead) return undefined;
+    let active = true;
+    fetchLeadExtras(initialLead.id).then(extra => {
+      if (!active || (!extra.obra && !extra.cierre)) return;
+      const more = fromLead(initialLead, extra);
+      setF(c => Object.fromEntries(Object.entries({...c, ...Object.fromEntries(Object.entries(more).filter(([k]) => empty(c[k])))})));
+      setLinked(cur => [...new Set([...cur, ...Object.keys(more)])]);
+    });
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // El espesor sale de la presentación (tabla productos) mientras no se haya escrito uno propio.
+  useEffect(() => {
+    const product = productos.find(p => p.id === f.sistema);
+    if (!product?.espesor) return;
+    setF(c => {
+      const auto = empty(c.espesor) || productos.some(p => p.espesor === c.espesor);
+      return auto && c.espesor !== product.espesor ? {...c, espesor: product.espesor} : c;
+    });
+  }, [f.sistema, productos]);
 
   const loadSaved = useCallback(async () => {
     setSavedState(s => ({...s, loading: true}));
@@ -416,20 +524,30 @@ export default function ServiceBreakdown({initialLead = null}) {
     return leads.filter(l => !q || `${l.nombre || ''} ${l.whatsapp || ''} ${l.folio || ''}`.toLowerCase().includes(q)).slice(0, 60);
   }, [leads, search]);
 
-  const applyLead = id => {
+  const applyLead = async id => {
     const lead = leads.find(l => l.id === id);
-    if (!lead) { setV('lead_id', null); return; }
-    setF(c => ({...c, lead_id: lead.id, ...fromLead(lead)}));
-    setMessage({type: 'ok', text: `Datos de ${lead.nombre} cargados. Completa lo que falte.`});
+    if (!lead) { setV('lead_id', null); setLinked([]); return; }
+    const extra = await fetchLeadExtras(lead.id);
+    const data = fromLead(lead, extra);
+    setF(c => ({...c, lead_id: lead.id, ...data}));
+    setLinked(Object.keys(data));
+    const found = Object.keys(data).length;
+    setExtrasNote(extra.obra || extra.cierre ? 'Se incluyó la fecha/obra programada del cliente.' : '');
+    setMessage({type: 'ok', text: `Se cargaron ${found} dato(s) de ${lead.nombre}. Completa lo que falte.`});
   };
 
   const totals = useMemo(() => {
-    const extras = num(f.monto_agregados);
+    const extraParts = [
+      num(f.monto_destechado) > 0 && `Destechado ${money(f.monto_destechado)}`,
+      num(f.monto_viaticos) > 0 && `Viáticos / distancia ${money(f.monto_viaticos)}`,
+      num(f.monto_otros) > 0 && `${f.concepto_otros || 'Otros'} ${money(f.monto_otros)}`,
+    ].filter(Boolean);
+    const extras = num(f.monto_destechado) + num(f.monto_viaticos) + num(f.monto_otros);
     const subtotal = num(f.monto_aplicacion) + extras;
     const iva = f.iva_aplica ? subtotal * VAT : 0;
     const hours = [f.destechado_incluye ? f.h_destechado : 0, f.h_punteado, f.h_aplicacion, f.h_acrilico].reduce((a, h) => a + num(h), 0);
     const days = Math.max(1, Math.ceil(hours / Math.max(1, num(f.jornada) || 8)));
-    return {extras, subtotal, iva, total: subtotal + iva, hours, days};
+    return {extras, extraParts, subtotal, iva, total: subtotal + iva, hours, days};
   }, [f]);
 
   const pending = useMemo(() => pendingFields(f), [f]);
@@ -481,7 +599,8 @@ export default function ServiceBreakdown({initialLead = null}) {
   };
 
   const openSaved = row => {
-    setF({...blankForm(), ...row.data});
+    setF(migrateForm(row.data));
+    setLinked([]);
     setSavedId(row.id);
     setMode(row.lead_id ? 'lead' : 'manual');
     setMessage({type: 'ok', text: `Desglose de ${row.cliente || 'cliente'} abierto.`});
@@ -499,6 +618,7 @@ export default function ServiceBreakdown({initialLead = null}) {
   const reset = () => {
     if (!window.confirm('¿Limpiar el formulario y empezar un desglose nuevo?')) return;
     setF(blankForm());
+    setLinked([]);
     setSavedId(null);
     setSearch('');
     setMessage({type: '', text: ''});
@@ -540,19 +660,27 @@ export default function ServiceBreakdown({initialLead = null}) {
             </div>
           )}
           <div className="f">
-            <Field label="Nombre del cliente" value={f.cliente} onChange={set('cliente')} required />
-            <Field label="Folio de presupuesto" value={f.folio} onChange={set('folio')} required />
-            <Field label="Domicilio" value={f.domicilio} onChange={set('domicilio')} required wide />
-            <Field label="Fecha" type="date" value={f.fecha} onChange={set('fecha')} required />
-            <Field label="Presentación / sistema" value={f.sistema} onChange={set('sistema')} placeholder="Ej. TH FORTE" />
+            <Field label="Nombre del cliente" value={f.cliente} onChange={set('cliente')} required from={L('cliente')} />
+            <Field label="Folio de presupuesto" value={f.folio} onChange={set('folio')} required from={L('folio')} />
+            <Field label="Teléfono" value={f.telefono} onChange={set('telefono')} from={L('telefono')} />
+            <Field label="Correo" type="email" value={f.email} onChange={set('email')} from={L('email')} />
+            <Field label="Domicilio" value={f.domicilio} onChange={set('domicilio')} required wide from={L('domicilio')} />
+            <Field label="Fecha del presupuesto" type="date" value={f.fecha} onChange={set('fecha')} required from={L('fecha')} />
+            <Field label="Presentación / sistema" from={L('sistema')} hint="Lista de presentaciones del sistema; el espesor se toma de ella.">
+              <select value={f.sistema} onChange={set('sistema')} className={miss('sistema')}>
+                <option value="">Seleccione…</option>
+                {f.sistema && !productos.some(p => p.id === f.sistema) && <option value={f.sistema}>{f.sistema}</option>}
+                {productos.map(p => <option key={p.id} value={p.id}>{presentationLabel(p)}</option>)}
+              </select>
+            </Field>
           </div>
         </fieldset>
 
         <fieldset className="sb-group">
           <legend>2 · Objetivo y trabajos previos</legend>
           <div className="f">
-            <Field label="Superficie a aplicar (m²)" type="number" min="0" step="0.01" value={f.superficie_m2} onChange={set('superficie_m2')} required />
-            <div className="w"><CheckGroup label="Tipo de superficie" options={SURFACES} selected={f.superficies} onChange={v => setV('superficies', v)} /></div>
+            <Field label="Superficie a aplicar (m²)" type="number" min="0" step="0.01" value={f.superficie_m2} onChange={set('superficie_m2')} required from={L('superficie_m2')} />
+            <div className="w">{L('superficies') && <small className="field-hint">Tipo de superficie tomado del cliente — puedes ajustarlo.</small>}<CheckGroup label="Tipo de superficie" options={SURFACES} selected={f.superficies} onChange={v => setV('superficies', v)} /></div>
             <div className="w">
               <label className="sb-inline-check"><input type="checkbox" checked={f.destechado_incluye} onChange={e => setV('destechado_incluye', e.target.checked)} /><span>Incluye destechado</span></label>
             </div>
@@ -575,7 +703,7 @@ export default function ServiceBreakdown({initialLead = null}) {
             <Field label="Tarifa eléctrica ($/kWh) · opcional" type="number" min="0" step="0.01" value={f.tarifa_kwh} onChange={set('tarifa_kwh')} hint="Solo para calcular el costo por hora." />
             <Field label="Costo de electricidad ($ MXN por hora)" type="number" min="0" step="0.01" value={f.costo_hora} onChange={set('costo_hora')} required hint={<button type="button" className="sb-link" onClick={calcElectricity} disabled={!(num(f.maquinas) && num(f.kw) && num(f.tarifa_kwh))}>Calcular: máquinas × kW × tarifa</button>} />
             <Field label="Distancia de cableado (m)" type="number" min="0" step="0.1" value={f.distancia_cable} onChange={set('distancia_cable')} required hint="De la toma de corriente al techo." />
-            <Field label="¿El inmueble tiene 220V?">
+            <Field label="¿El inmueble tiene 220V?" from={L('power_220')}>
               <select value={f.power_220} onChange={set('power_220')}>{POWER.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
             </Field>
             {f.power_220 !== 'si' && (
@@ -589,8 +717,8 @@ export default function ServiceBreakdown({initialLead = null}) {
         <fieldset className="sb-group">
           <legend>4 · Aplicación</legend>
           <div className="f">
-            <Field label="Espesor acordado" value={f.espesor} onChange={set('espesor')} required placeholder="Ej. 1 pulgada" hint="TH Forte: menor de 1 cm." />
-            <Field label="Tono del acrílico">
+            <Field label="Espesor acordado" value={f.espesor} onChange={set('espesor')} required placeholder="Ej. 1 cm (10 mm)" hint="Se llena con el espesor de la presentación; puedes cambiarlo." />
+            <Field label="Tono del acrílico" from={L('tono')}>
               <select value={f.tono} onChange={set('tono')} className={miss('tono')}><option value="">Seleccione…</option>{TONES.map(t => <option key={t}>{t}</option>)}</select>
             </Field>
           </div>
@@ -604,7 +732,7 @@ export default function ServiceBreakdown({initialLead = null}) {
             <Field label="Aplicación de poliuretano (hrs)" type="number" min="0" step="0.5" value={f.h_aplicacion} onChange={set('h_aplicacion')} required />
             <Field label="Recubrimiento acrílico (hrs)" type="number" min="0" step="0.5" value={f.h_acrilico} onChange={set('h_acrilico')} required />
             <Field label="Jornada (hrs por día)" type="number" min="1" step="0.5" value={f.jornada} onChange={set('jornada')} hint={`Total: ${totals.hours.toLocaleString('es-MX')} hrs ≈ ${totals.days} día(s).`} />
-            <Field label="Fecha tentativa de inicio" type="date" value={f.fecha_inicio} onChange={set('fecha_inicio')} required />
+            <Field label="Fecha tentativa de inicio" type="date" value={f.fecha_inicio} onChange={set('fecha_inicio')} required from={L('fecha_inicio')} hint={extrasNote || undefined} />
             <Field label="Aplicadores" type="number" min="0" step="1" value={f.aplicadores} onChange={set('aplicadores')} required />
             <Field label="Ayudantes" type="number" min="0" step="1" value={f.ayudantes} onChange={set('ayudantes')} required />
             <Field label="Supervisores" type="number" min="0" step="1" value={f.supervisores} onChange={set('supervisores')} required />
@@ -614,12 +742,16 @@ export default function ServiceBreakdown({initialLead = null}) {
         <fieldset className="sb-group">
           <legend>6 · Alcance del presupuesto</legend>
           <div className="f">
-            <Field label="Aplicación ($)" type="number" min="0" step="0.01" value={f.monto_aplicacion} onChange={set('monto_aplicacion')} required />
-            <Field label="Agregados ($)" type="number" min="0" step="0.01" value={f.monto_agregados} onChange={set('monto_agregados')} hint="Deja en 0 si el presupuesto va sin agregados." />
-            <Field label="Concepto de los agregados" value={f.agregados_detalle} onChange={set('agregados_detalle')} wide placeholder="Ej. Destechado, viáticos" />
+            <Field label="Aplicación ($)" type="number" min="0" step="0.01" value={f.monto_aplicacion} onChange={set('monto_aplicacion')} required from={L('monto_aplicacion')} hint="Poliuretano + acrílico, sin agregados." />
+            <Field label="Descuento / promoción" value={f.descuento} onChange={set('descuento')} from={L('descuento')} placeholder="Ej. Temporada" />
+            <Field label="Destechado ($)" type="number" min="0" step="0.01" value={f.monto_destechado} onChange={set('monto_destechado')} from={L('monto_destechado')} hint="Déjalo vacío si el destechado no se cobra." />
+            <Field label="Viáticos / distancia ($)" type="number" min="0" step="0.01" value={f.monto_viaticos} onChange={set('monto_viaticos')} from={L('monto_viaticos')} />
+            <Field label="Otros agregados ($)" type="number" min="0" step="0.01" value={f.monto_otros} onChange={set('monto_otros')} />
+            <Field label="Concepto de otros agregados" value={f.concepto_otros} onChange={set('concepto_otros')} placeholder="Ej. Maniobras especiales" />
             <div className="w"><label className="sb-inline-check"><input type="checkbox" checked={f.iva_aplica} onChange={e => setV('iva_aplica', e.target.checked)} /><span>Aplicar IVA (16%)</span></label></div>
           </div>
           <div className="quote-price-summary">
+            <span>Agregados<strong>{money(totals.extras)}</strong></span>
             <span>Subtotal<strong>{money(totals.subtotal)}</strong></span>
             <span>IVA<strong>{money(totals.iva)}</strong></span>
             <span>Total<strong>{money(totals.total)}</strong></span>
@@ -647,7 +779,7 @@ export default function ServiceBreakdown({initialLead = null}) {
           <button type="button" className="btn" disabled={pdfBusy} onClick={download}>{pdfBusy ? 'Generando PDF…' : 'Descargar PDF'}</button>
         </div>
         <div className="sb-preview-scroll">
-          <BreakdownDocument f={f} totals={totals} docRef={docRef} />
+          <BreakdownDocument f={f} totals={totals} docRef={docRef} productos={productos} />
         </div>
       </div>
 

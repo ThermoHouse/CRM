@@ -66,7 +66,7 @@ Otras acciones relacionadas incluyen:
 
 Pestaña **Desglose** (roles `root`, `sales`, `administrative` y `manager`; también se abre desde el botón **Desglose** de cada fila en Leads). Formulario interactivo que genera el documento "Descripción detallada del servicio" para el cliente, como complemento de la cotización o de forma independiente.
 
-- Se puede **vincular un cliente existente** (carga nombre, domicilio, folio, m², tipo de superficie, tono, condiciones del techo, objetos y montos de la cotización) o **capturar todo manualmente**. Los datos que no existen en el lead se llenan en el formulario; los pendientes se resaltan y se cuentan.
+- Se puede **vincular un cliente existente** o **capturar todo manualmente**. Al vincular se cargan, con la etiqueta "del cliente": nombre, teléfono, correo, domicilio (dirección + C.P. + ciudad + estado), folio, fecha del presupuesto, presentación (se empata con la tabla `productos`, que también aporta el espesor), m², tipo de superficie, tono, condiciones del techo, objetos, 220V (voltaje/suministros), descuento, montos separados de aplicación, destechado y viáticos/distancia (todos editables), IVA y la fecha de instalación de su obra o cierre. Los datos que no existen en el lead se llenan en el formulario; los pendientes se resaltan y se cuentan.
 - La vista previa es el mismo documento que se descarga en **PDF** (A4, logo de ThermoHouse y número de página en cada hoja). Los datos sin llenar salen como línea en blanco.
 - Calcula subtotal, IVA, total, anticipo del 50 %, total de horas y días en sitio. No modifica el lead.
 - **Guardar** usa la tabla `service_breakdowns` (migración 34, opcional). El borrador se conserva en la sesión del navegador al cambiar de pestaña.
