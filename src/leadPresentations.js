@@ -16,9 +16,10 @@ export function buildLeadSpecifications(lines, defaultTone, applications) {
     .map(line => {
       const details = PRESENTATION_DETAILS[line.sistema]?.detail || 'espuma de poliuretano con recubrimiento acrílico';
       const area = Number(line.area_m2) > 0 ? ` en ${Number(line.area_m2).toLocaleString('es-MX')} m²` : '';
-      const tone = line.sistema === 'TH FIX' ? (line.tono_acrilico || defaultTone) : (line.tono_acrilico || defaultTone);
+      const tone = line.tono_acrilico || defaultTone;
       const color = tone && tone !== 'No aplica' ? `, tono ${tone.toLowerCase()}` : '';
-      return `${presentationLabel(line.sistema)}: ${details}${area}${color}.`;
+      const destechadoArea = Number(line.destechado_m2) > 0 ? ` Destechado estimado en ${Number(line.destechado_m2).toLocaleString('es-MX')} m².` : '';
+      return `${presentationLabel(line.sistema)}: ${details}${area}${color}.${destechadoArea}`;
     });
   const surfaces = applications?.length ? `Superficie: ${applications.join(', ').toLowerCase()}.` : '';
   return [

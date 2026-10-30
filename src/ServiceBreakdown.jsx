@@ -113,6 +113,7 @@ function fromLead(l, extra = {}) {
   const byUnit = num(l.precio_final_m2) * num(l.area_m2);
   const presentationLines = Array.isArray(l.presentaciones) ? l.presentaciones.filter(line => line.sistema) : [];
   const primaryPresentation = presentationLines[0];
+  const primaryDestechado = num(primaryPresentation?.destechado_monto ?? destechado);
   const aplicacion = primaryPresentation
     ? num(primaryPresentation.monto) || num(primaryPresentation.precio_final_m2) * num(primaryPresentation.area_m2)
     : subtotal > 0 ? Math.max(0, subtotal - destechado - viaticos) : byUnit > 0 ? byUnit : '';
@@ -128,6 +129,8 @@ function fromLead(l, extra = {}) {
     espesor: PRESENTATION_THICKNESS[normalizePresentation(line.sistema)] || '',
     tono: line.tono_acrilico || l.tono_acrilico || '',
     monto_aplicacion: num(line.monto) || num(line.precio_final_m2) * num(line.area_m2),
+    destechado_m2: line.destechado_m2 ?? '',
+    monto_destechado: num(line.destechado_monto),
   }));
   const dateSource = l.fecha_presupuesto || l.created_at;
   const out = {
@@ -145,19 +148,20 @@ function fromLead(l, extra = {}) {
     sistema: normalizePresentation(l.sistema || l.presentacion || primaryPresentation?.sistema),
     trabajos: works,
     superficie_m2: area,
+    destechado_m2: primaryPresentation?.destechado_m2 ?? l.destechado_m2 ?? '',
     superficies: Array.isArray(l.aplicaciones) ? l.aplicaciones : [],
     condiciones: conditions,
     objetos: Array.isArray(l.objetos_techo) ? l.objetos_techo : [],
     tono: primaryPresentation?.tono_acrilico || l.tono_acrilico || '',
     power_220: power,
     descuento: l.descuento || '',
-    monto_destechado: destechado > 0 ? destechado : '',
+    monto_destechado: primaryDestechado > 0 ? primaryDestechado : '',
     monto_viaticos: viaticos > 0 ? viaticos : '',
     monto_aplicacion: aplicacion,
     fecha_inicio: String(extra.obra?.programacion || extra.cierre?.fecha_instalacion || '').slice(0, 10),
   };
   // Hay destechado si se cobra o si el techo tiene impermeabilizante anterior / desgaste.
-  if (destechado > 0 || conditions.some(c => /impermeabilizante|desgaste/i.test(c))) out.destechado_incluye = true;
+  if (destechado > 0 || presentationLines.some(line => num(line.destechado_m2) > 0) || conditions.some(c => /impermeabilizante|desgaste/i.test(c))) out.destechado_incluye = true;
   if (l.iva_aplica != null || hasSnapshot) out.iva_aplica = l.iva_aplica != null ? Boolean(l.iva_aplica) : num(l.iva) > 0;
   return Object.fromEntries(Object.entries(out).filter(([k, v]) => k === 'iva_aplica' || k === 'destechado_incluye' || !empty(v)));
 }
@@ -187,7 +191,8 @@ function pendingFields(f) {
   need('Presentación / sistema', f.sistema);
   need('Superficie (m²)', f.superficie_m2);
   need('Tipo de superficie', f.superficies);
-  if (f.destechado_incluye) need('Superficie de destechado (m²)', f.destechado_m2);
+  const additionalDestechado = (f.trabajos || []).some(work => num(work.destechado_m2) > 0);
+  if (f.destechado_incluye && !additionalDestechado) need('Superficie de destechado de la presentación principal (m²)', f.destechado_m2);
   need('Cantidad de grietas / punteo', f.grietas_cantidad);
   need('Máquinas conectadas a la luz', f.maquinas);
   need('Minutos de encendido', f.minutos);
@@ -254,7 +259,8 @@ const Blank = () => <span className="sb-blank" aria-label="por completar" />;
 const val = (v, suffix = '') => (empty(v) ? <Blank /> : <>{typeof v === 'number' ? v.toLocaleString('es-MX') : v}{suffix}</>);
 
 function BreakdownDocument({f, totals, docRef, productos}) {
-  const works = [{sistema: f.sistema, superficie_m2: f.superficie_m2, espesor: f.espesor, tono: f.tono, monto_aplicacion: f.monto_aplicacion}, ...(f.trabajos || [])];
+  const works = [{sistema: f.sistema, superficie_m2: f.superficie_m2, espesor: f.espesor, tono: f.tono, monto_aplicacion: f.monto_aplicacion, destechado_m2: f.destechado_m2, monto_destechado: f.monto_destechado}, ...(f.trabajos || [])];
+  const destechadoWorks = works.filter(work => num(work.destechado_m2) > 0 || num(work.monto_destechado) > 0);
   const presentationFor = system => {
     const item = productos.find(p => p.id === system);
     return item ? (item.id === 'TH LIGHT' ? 'TH LITE' : item.nombre || item.id) : system;
@@ -301,16 +307,7 @@ function BreakdownDocument({f, totals, docRef, productos}) {
         <div className="sb-avoid">
           <h2>2. Trabajos previos a la aplicación</h2>
           <h3>2.1 Destechado</h3>
-          {f.destechado_incluye ? (
-            <p>
-              Retiro del impermeabilizante anterior, material suelto o en mal estado, escombro y cualquier elemento que
-              impida que el poliuretano se adhiera directamente a la superficie sólida. Superficie estimada de
-              destechado: {val(f.destechado_m2 === '' ? '' : Number(f.destechado_m2), ' m²')}. El material retirado
-              {f.destechado_destino === 'retiro' ? ' se retira del sitio.' : ' se junta en el área indicada por el cliente.'}
-            </p>
-          ) : (
-            <p>No se contempla destechado en este servicio.</p>
-          )}
+          {f.destechado_incluye ? <><p>El destechado se limita a las superficies que se indican para cada presentación:</p><ul>{(destechadoWorks.length ? destechadoWorks : [works[0]]).map((work, index) => <li key={work.id || `destechado-${index}`}>{presentationFor(work.sistema) || 'Trabajo principal'}: {val(work.destechado_m2 === '' ? '' : Number(work.destechado_m2), ' m²')}. El material retirado{f.destechado_destino === 'retiro' ? ' se retira del sitio.' : ' se junta en el área indicada por el cliente.'}</li>)}</ul></> : <p>No se contempla destechado en este servicio.</p>}
         </div>
         <div className="sb-avoid">
           <h3>2.2 Limpieza</h3>
@@ -431,13 +428,15 @@ function BreakdownDocument({f, totals, docRef, productos}) {
           y se suma al total solo con autorización del cliente.
         </p>
         <table className="sb-table">
-          <thead><tr><th>Trabajo / presentación</th><th>Superficie</th><th>Espesor</th><th>Tono</th><th>Monto (MXN)</th></tr></thead>
+          <thead><tr><th>Trabajo / presentación</th><th>Superficie</th><th>Espesor</th><th>Tono</th><th>Destechado</th><th>Costo destechado</th><th>Monto (MXN)</th></tr></thead>
           <tbody>{works.map((work, index) => (
             <tr key={work.id || `work-${index}`}>
               <td>{presentationFor(work.sistema) || <Blank />}</td>
               <td>{val(work.superficie_m2 === '' ? '' : Number(work.superficie_m2), ' m²')}</td>
               <td>{val(work.espesor)}</td>
               <td>{work.tono === 'No aplica' ? 'No aplica' : val(work.tono)}</td>
+              <td>{val(num(work.destechado_m2) || '', ' m²')}</td>
+              <td>{num(work.monto_destechado) > 0 ? money(work.monto_destechado) : '$0.00'}</td>
               <td>{empty(work.monto_aplicacion) ? <Blank /> : money(work.monto_aplicacion)}</td>
             </tr>
           ))}</tbody>
@@ -590,12 +589,13 @@ export default function ServiceBreakdown({initialLead = null}) {
 
   const totals = useMemo(() => {
     const application = num(f.monto_aplicacion) + (f.trabajos || []).reduce((sum, work) => sum + num(work.monto_aplicacion), 0);
+    const destechado = num(f.monto_destechado) + (f.trabajos || []).reduce((sum, work) => sum + num(work.monto_destechado), 0);
     const extraParts = [
-      num(f.monto_destechado) > 0 && `Destechado ${money(f.monto_destechado)}`,
+      destechado > 0 && `Destechado ${money(destechado)}`,
       num(f.monto_viaticos) > 0 && `Viáticos / distancia ${money(f.monto_viaticos)}`,
       num(f.monto_otros) > 0 && `${f.concepto_otros || 'Otros'} ${money(f.monto_otros)}`,
     ].filter(Boolean);
-    const extras = num(f.monto_destechado) + num(f.monto_viaticos) + num(f.monto_otros);
+    const extras = destechado + num(f.monto_viaticos) + num(f.monto_otros);
     const subtotal = application + extras;
     const iva = f.iva_aplica ? subtotal * VAT : 0;
     const hours = [f.destechado_incluye ? f.h_destechado : 0, f.h_punteado, f.h_aplicacion, f.h_acrilico].reduce((a, h) => a + num(h), 0);
@@ -807,6 +807,8 @@ export default function ServiceBreakdown({initialLead = null}) {
                 <Field label="Tono del acrílico">
                   <select value={work.tono} onChange={event => updateWork(work.id, {tono: event.target.value})}><option value="">Seleccione…</option>{TONES.map(tone => <option key={tone}>{tone}</option>)}</select>
                 </Field>
+                <Field label="Destechado de esta presentación (m²)" type="number" min="0" step="0.01" value={work.destechado_m2 ?? ''} onChange={event => updateWork(work.id, {destechado_m2: event.target.value})} />
+                <Field label="Costo de destechado ($)" type="number" min="0" step="0.01" value={work.monto_destechado ?? ''} onChange={event => updateWork(work.id, {monto_destechado: event.target.value})} />
                 <Field label="Monto de aplicación ($)" type="number" min="0" step="0.01" value={work.monto_aplicacion} onChange={event => updateWork(work.id, {monto_aplicacion: event.target.value})} />
               </div>
             </div>)}
@@ -833,7 +835,7 @@ export default function ServiceBreakdown({initialLead = null}) {
           <div className="f">
             <Field label="Aplicación del trabajo principal ($)" type="number" min="0" step="0.01" value={f.monto_aplicacion} onChange={set('monto_aplicacion')} required from={L('monto_aplicacion')} hint="Poliuretano + acrílico, sin agregados. Se suma con los trabajos adicionales." />
             <Field label="Descuento / promoción" value={f.descuento} onChange={set('descuento')} from={L('descuento')} placeholder="Ej. Temporada" />
-            <Field label="Destechado ($)" type="number" min="0" step="0.01" value={f.monto_destechado} onChange={set('monto_destechado')} from={L('monto_destechado')} hint="Déjalo vacío si el destechado no se cobra." />
+            <Field label="Costo de destechado (presentación principal, $)" type="number" min="0" step="0.01" value={f.monto_destechado} onChange={set('monto_destechado')} from={L('monto_destechado')} hint="Se suma al destechado de las demás presentaciones." />
             <Field label="Viáticos / distancia ($)" type="number" min="0" step="0.01" value={f.monto_viaticos} onChange={set('monto_viaticos')} from={L('monto_viaticos')} />
             <Field label="Otros agregados ($)" type="number" min="0" step="0.01" value={f.monto_otros} onChange={set('monto_otros')} />
             <Field label="Concepto de otros agregados" value={f.concepto_otros} onChange={set('concepto_otros')} placeholder="Ej. Maniobras especiales" />
