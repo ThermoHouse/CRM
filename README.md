@@ -43,11 +43,11 @@ En las cotizaciones, **Sistema / presentación** usa una sola selección. El aju
 
 ## Permisos
 - `root`: todos los módulos, aprobación de usuarios y auditoría.
-- `sales`: dashboard comercial, leads e Inbox; puede consultar precios.
-- `operations`: visitas, instalaciones, mantenimiento e inventario operativo.
+- `sales`: dashboard comercial, todos los leads e Inbox; consulta mantenimiento y reportes técnicos de garantía en modo lectura y puede consultar precios. Solo puede editar/eliminar leads propios o asignados para seguimiento.
+- `operations`: visitas, instalaciones e inventario operativo.
 - `administrative`: lectura de todos los módulos; puede crear leads y editar tarifas, productos, inventario, visitas, instalaciones, cierres, finanzas y caja chica. No edita ni elimina leads existentes.
 - `manager` (gerente): consulta y reportes; puede crear leads, pero no editar ni eliminar registros existentes.
-- `sales` solo ve y edita los leads donde es dueño de la comisión o tiene asignado el seguimiento (migración 24).
+- Gerente, Administrativo y Ventas pueden consultar y generar/abrir PDFs de reportes de garantía. Solo Administrativo y root pueden crear o editar reportes y adjuntos.
 
 Los cambios de filas se registran en `public.security_events`, visible solo para root. Los intentos de inicio de sesión fallidos se consultan en Supabase Auth Logs. Los rechazos de políticas RLS y eventos de infraestructura requieren un Log Drain para centralizarlos; no se pueden registrar de forma confiable desde el navegador. La bitácora de la app guarda metadatos, no el contenido completo de los registros.
 
@@ -116,7 +116,7 @@ Al cambiar un lead a **Confirmado**, el CRM pide fecha, duración y lugar. Luego
 ## Cierres, finanzas, aplicaciones, mantenimiento e inventario químico (migraciones 24–33)
 Ejecuta en orden, después de `23_security_hardening.sql` y revisando antes cuáles ya están aplicadas:
 
-24. `24_manager_role_and_sales_scope.sql`: rol `manager` y Ventas limitado a sus propios leads, visitas, obras e historial de contacto. Ventas deja de leer garantías.
+24. `24_manager_role_and_sales_scope.sql`: rol `manager` y permisos base de lectura/escritura por perfil; Ventas inicialmente ve leads, visitas, obras e historial de contacto propios. Ventas deja de leer garantías.
 25. `25_finance_ledger.sql`: categorías libres (fijo/variable), libro de ingresos y egresos y bucket privado `comprobantes` (comprobante opcional).
 26. `26_visits_closings_and_installations.sql`: al pasar un lead a **Visita** se crea la visita; al pasar a **Venta cerrada** se crea un cierre pendiente. Administrativo confirma agenda y anticipo (recibido, perdonado con motivo o pendiente) y **hasta entonces** se crea la obra en Instalaciones. Un anticipo recibido se registra solo como ingreso. Incluye recuperación de leads que ya estaban en esos estados. Administrativo también puede editar Visitas e Instalaciones.
 27. `27_petty_cash.sql`: caja chica y viáticos. Los viáticos y gastos generan solos un egreso en el libro; reposición y devolución no cuentan como gasto.
@@ -127,5 +127,7 @@ Ejecuta en orden, después de `23_security_hardening.sql` y revisando antes cuá
 32. `32_applications_calendar_and_maintenance.sql`: calendario de aplicaciones y mantenimientos recurrentes cada 2, 3 o 4 años. Permite registrar una aplicación desde un lead con venta cerrada o capturar un nuevo cliente.
 33. `33_chemical_consumption_by_height.sql`: formulario de salidas de isocianato y resina por centímetros consumidos, historial y actualización automática de litros restantes y gráfica de mínimos de compra.
 34. `34_service_breakdowns.sql`: tabla `service_breakdowns` para guardar los "Desgloses de servicios profesionales" (pestaña **Desglose**, roles `root`, `sales`, `administrative` y `manager`). Es opcional: el formulario y el PDF funcionan sin ella; solo habilita Guardar y la lista de guardados. Ventas ve solo los suyos; root, administrativo y gerente ven todos.
+39. `39_warranty_report_workflow.sql`: historial de reportes técnicos de garantía, bucket privado para PDFs/fotografías y permisos de consulta para Ventas/Gerente; solo Administrativo y root pueden guardar o modificar reportes. Ejecutar al final, después de las migraciones `24`–`38`, incluida `32_applications_calendar_and_maintenance.sql`.
+40. `40_sales_all_leads_read.sql`: permite a Ventas consultar todos los leads sin ampliar permisos para editarlos/eliminarlos, registrar intentos de contacto ni consultar visitas/obras de leads ajenos.
 
 Para dar el rol de gerente, root lo asigna desde **Usuarios** (Gerente · consulta y reportes). No requiere cambios en las Edge Functions ni nuevos secretos.

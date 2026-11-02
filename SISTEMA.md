@@ -23,12 +23,12 @@ Los roles del CRM son:
 | Rol | Acceso funcional |
 |---|---|
 | `root` | Todos los módulos; administración de usuarios, plazas y auditoría. |
-| `sales` | Dashboard comercial, Leads, Desglose, Inbox Bot y Perfil. Solo ve y edita sus propios leads (dueño de comisión o seguimiento asignado). |
+| `sales` | Dashboard comercial, Leads, Desglose, Inbox Bot y Perfil. Ve todos los leads; solo puede editar/eliminar los que le pertenecen o tiene asignados para seguimiento. |
 | `operations` | Visitas, Instalaciones, Mantenimiento, Inventario y Perfil. |
 | `administrative` | Consulta de todos los módulos; puede crear leads y administra precios, productos, inventario, visitas, instalaciones, cierres, finanzas y caja chica. No edita ni elimina leads existentes. Inbox Bot es de solo lectura. |
 | `manager` | Gerente: consulta y reportes; puede crear leads, pero no editar ni eliminar registros existentes. |
 
-La interfaz oculta los módulos no autorizados y pone en modo de solo lectura las pantallas correspondientes. La seguridad de los datos no depende solo de la interfaz: las migraciones configuran RLS y funciones/políticas en PostgreSQL. El esquema base y la migración de solicitudes de acceso dejan las tablas sin acceso hasta que la migración de roles instale políticas específicas; la migración 23 elimina políticas permisivas heredadas. La asignación de roles se realiza desde **Usuarios** para root. El primer root debe asignarse explícitamente siguiendo las instrucciones del README; el sistema no lo elige automáticamente por ser la única cuenta.
+La interfaz oculta los módulos no autorizados y pone en modo de solo lectura las pantallas correspondientes. Ventas consulta todos los leads, pero las políticas RLS conservan edición y eliminación solo para leads propios/asignados y restringen el registro de intentos de contacto. Requiere `supabase/40_sales_all_leads_read.sql`. La seguridad de los datos no depende solo de la interfaz: las migraciones configuran RLS y funciones/políticas en PostgreSQL. El esquema base y la migración de solicitudes de acceso dejan las tablas sin acceso hasta que la migración de roles instale políticas específicas; la migración 23 elimina políticas permisivas heredadas. La asignación de roles se realiza desde **Usuarios** para root. El primer root debe asignarse explícitamente siguiendo las instrucciones del README; el sistema no lo elige automáticamente por ser la única cuenta.
 
 ## Módulos y funciones
 
@@ -91,7 +91,9 @@ Muestra las aplicaciones en un calendario con sus fechas de instalación y mante
 
 ### Mantenimiento
 
-Gestiona garantías y mantenimientos: cliente, folio, sistema, fecha de instalación, próximo mantenimiento, revisitas y estado. Al marcar un mantenimiento como realizado, el sistema registra la fecha y programa el ciclo siguiente con el intervalo de 2, 3 o 4 años configurado en la aplicación.
+Gerente, Administrativo y Ventas consultan en modo de solo lectura el historial de reportes técnicos por garantía. Cada visita guarda folio, cliente, domicilio, sistema instalado, técnico, motivo, hallazgos, análisis, dictamen, recomendaciones y hasta cuatro fotografías; además, permite generar el PDF estandarizado o abrir un PDF existente adjunto. Los archivos viven en el bucket privado `warranty-reports`. Solo Administrativo puede crear y editar reportes y adjuntos; root conserva acceso de administración. La migración `supabase/39_warranty_report_workflow.sql` habilita esquema, almacenamiento y permisos.
+
+Las garantías continúan vinculadas a las instalaciones y al calendario de mantenimiento recurrente cada 2, 3 o 4 años. Al marcar un mantenimiento como realizado, se registra la fecha y se programa el siguiente ciclo.
 
 ### Precios
 

@@ -1,6 +1,6 @@
 create table if not exists public.warranty_reports (
   id uuid primary key default gen_random_uuid(),
-  guarantee_id uuid not null references public.garantias(id) on delete cascade,
+  guarantee_id uuid not null references public.garantias(id),
   folio text not null unique,
   cliente text not null,
   domicilio text,
@@ -16,7 +16,7 @@ create table if not exists public.warranty_reports (
   recomendaciones text,
   foto_paths text[] not null default '{}'::text[],
   pdf_path text,
-  created_by uuid references public.profiles(id) on delete set null,
+  created_by uuid default auth.uid() references public.profiles(id) on delete set null,
   updated_by uuid references public.profiles(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -70,7 +70,7 @@ begin
     when 'productos' then return user_role in ('sales','operations');
     when 'visitas' then return user_role in ('sales','operations');
     when 'obras' then return user_role in ('sales','operations');
-    when 'garantias' then return user_role = 'sales';
+    when 'garantias' then return user_role in ('sales','operations');
     when 'barriles' then return user_role = 'operations';
     when 'inventory_movements' then return user_role = 'operations';
     when 'lead_audit' then return false;
@@ -110,6 +110,41 @@ $$;
 
 grant execute on function public.can_read_table(text) to authenticated;
 grant execute on function public.can_write_table(text) to authenticated;
+
+create or replace function public.schedule_application_maintenance(
+  p_garantia_id uuid,
+  p_fecha date
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if public.current_user_role() not in ('root','administrative') then
+    raise exception 'Solo Administrativo puede agendar mantenimientos.'
+      using errcode = '42501';
+  end if;
+  if p_fecha is null then
+    raise exception 'Indica la fecha del mantenimiento.';
+  end if;
+
+  update public.garantias
+  set proximo_mtto = p_fecha, status = 'activa'
+  where id = p_garantia_id
+    and (instalacion is null or p_fecha >= instalacion);
+  if not found then
+    if exists (select 1 from public.garantias where id = p_garantia_id) then
+      raise exception 'La fecha de mantenimiento no puede ser anterior a la instalación.';
+    end if;
+    raise exception 'No se encontró el mantenimiento de esta aplicación.'
+      using errcode = 'P0002';
+  end if;
+end;
+$$;
+
+revoke all on function public.schedule_application_maintenance(uuid, date) from public, anon;
+grant execute on function public.schedule_application_maintenance(uuid, date) to authenticated;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
