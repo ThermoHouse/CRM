@@ -14,8 +14,8 @@ export async function downloadQuotePdf(lead) {
     .replace(/[^a-zA-Z0-9_-]+/g, '-')
     .replace(/^-|-$/g, '') || 'cotizacion';
 
-  wrapper.style.cssText = 'position:fixed;left:-10000px;top:0;width:210mm;height:297mm;overflow:hidden;background:#fff;';
-  quote.style.cssText += 'width:210mm;margin:0;background:#fff;transform-origin:top left;';
+  wrapper.style.cssText = 'position:fixed;left:-10000px;top:0;width:210mm;background:#fff;';
+  quote.style.cssText += 'position:relative;left:auto;top:auto;width:210mm;margin:0;background:#fff;';
   const compactStyles = document.createElement('style');
   compactStyles.textContent = `
     .quote-document{box-sizing:border-box;font-size:8px!important;line-height:1.08!important}
@@ -63,9 +63,6 @@ export async function downloadQuotePdf(lead) {
     .quote-presentations-print th,.quote-presentations-print td{padding:1mm!important;font-size:7px!important}
   `;
   quote.prepend(compactStyles);
-  quote.querySelectorAll('.quote-page').forEach(page => {
-    page.style.cssText += 'width:100%;height:auto;min-height:0;max-height:none;padding:3mm;break-before:auto!important;page-break-before:auto!important;break-after:auto!important;page-break-after:auto!important;';
-  });
   document.body.append(wrapper);
   wrapper.append(quote);
 
@@ -75,27 +72,45 @@ export async function downloadQuotePdf(lead) {
   }
 
   try {
-    const targetHeight = 285;
-    let scale = 1;
-    for (let attempt = 0; attempt < 4; attempt += 1) {
-      const heightMm = quote.offsetHeight * 25.4 / 96;
-      scale = Math.min(1, targetHeight / heightMm);
-      quote.style.width = `${210 / scale}mm`;
+    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+      import('html2canvas'),
+      import('jspdf'),
+    ]);
+    const canvas = await html2canvas(quote, {
+      backgroundColor: '#ffffff',
+      height: quote.scrollHeight,
+      scale: 2,
+      useCORS: true,
+      width: quote.scrollWidth,
+      windowHeight: quote.scrollHeight,
+      windowWidth: quote.scrollWidth,
+    });
+    if (!canvas.width || !canvas.height) {
+      throw new Error('No se pudo capturar el contenido de la cotización.');
     }
-    quote.style.transform = `scale(${scale})`;
 
-    const { default: html2pdf } = await import('html2pdf.js');
-    await html2pdf()
-      .set({
-        margin: 0,
-        filename: `cotizacion-${fileName}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['avoid-all'] },
-      })
-      .from(wrapper)
-      .save();
+    const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 7;
+    const fitScale = Math.min(
+      (pageWidth - margin * 2) / canvas.width,
+      (pageHeight - margin * 2) / canvas.height,
+    );
+    const imageWidth = canvas.width * fitScale;
+    const imageHeight = canvas.height * fitScale;
+    const image = canvas.toDataURL('image/jpeg', 0.98);
+    pdf.addImage(
+      image,
+      'JPEG',
+      (pageWidth - imageWidth) / 2,
+      (pageHeight - imageHeight) / 2,
+      imageWidth,
+      imageHeight,
+      undefined,
+      'FAST',
+    );
+    pdf.save(`cotizacion-${fileName}.pdf`);
   } finally {
     wrapper.remove();
     if (button) {
