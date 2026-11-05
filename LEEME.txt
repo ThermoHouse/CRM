@@ -1,0 +1,19 @@
+CAMBIOS PARA QUE VENTAS PUEDA CREAR REPORTES TECNICOS (pestaña Mantenimiento)
+
+1) BASE DE DATOS (lo más importante)
+   Abre Supabase > SQL Editor, pega y ejecuta completo: APLICAR_EN_SUPABASE.sql
+   - 41: permite a Ventas crear/editar SUS reportes y subir fotos/PDF.
+   - 42: permite a Ventas usar "Registrar realizado" (nueva función segura).
+
+2) CODIGO (copia estos archivos sobre tu proyecto, respetando las rutas)
+   - src/App.jsx              (Ventas ve el botón "Registrar realizado")
+   - src/WarrantyReports.jsx  (usa la nueva función complete_application_maintenance)
+   Después vuelve a desplegar (build/deploy) tu CRM.
+
+3) PRUEBA
+   Entra como vendedor > Mantenimiento > "+ Nuevo reporte" (con foto y PDF)
+   y "Registrar realizado".
+
+NOTA: Ventas solo edita los reportes que él mismo creó. Agendar mantenimientos
+(fecha) sigue siendo de Administrativo/root, porque vive en la pestaña
+Instalaciones, que Ventas no tiene.

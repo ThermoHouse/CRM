@@ -35,7 +35,7 @@ function createReportForm(guarantee,work,report){
  };
 }
 
-function WarrantyReports({canEdit,canManageMaintenance=false,userId}){
+function WarrantyReports({canEdit,canManageMaintenance=false,canRegisterMaintenance=canManageMaintenance,userId}){
  const[guarantees,setGuarantees]=useState([]);
  const[works,setWorks]=useState([]);
  const[reports,setReports]=useState([]);
@@ -184,7 +184,7 @@ function WarrantyReports({canEdit,canManageMaintenance=false,userId}){
   if(!window.confirm(`¿Registrar como realizado el mantenimiento de ${guarantee.cliente||'este cliente'}? Se programará el siguiente ciclo.`))return;
   setError('');setMaintenanceBusy(guarantee.id);
   try{
-   const{error:updateError}=await sb.from('garantias').update({status:'mantenimiento_hecho'}).eq('id',guarantee.id);
+   const{error:updateError}=await sb.rpc('complete_application_maintenance',{p_garantia_id:guarantee.id});
    if(updateError)throw updateError;
    await load();
    setMessage('Mantenimiento registrado; el siguiente ciclo quedó programado.');
@@ -217,7 +217,7 @@ function WarrantyReports({canEdit,canManageMaintenance=false,userId}){
     const work=workById.get(guarantee.obra_id);
     const items=reportsByGuarantee.get(guarantee.id)||[];
     return <article className="card warranty-card" key={guarantee.id}>
-     <header className="warranty-card-heading"><div><span className="lbl">Instalación · {guarantee.folio||work?.folio||'Sin folio'}</span><h3>{guarantee.cliente||work?.cliente||'Cliente sin nombre'}</h3><p className="mut">{guarantee.sistema||work?.sistema||'Sistema no especificado'} · Instalación {displayDate(guarantee.instalacion||work?.programacion)}</p></div><div className="warranty-dates"><span>Próximo mantenimiento</span><strong>{displayDate(guarantee.proximo_mtto)}</strong>{canManageMaintenance&&<button type="button" className="btn ghost" disabled={maintenanceBusy===guarantee.id} onClick={()=>markMaintenanceComplete(guarantee)}>{maintenanceBusy===guarantee.id?'Guardando…':'Registrar realizado'}</button>}</div></header>
+     <header className="warranty-card-heading"><div><span className="lbl">Instalación · {guarantee.folio||work?.folio||'Sin folio'}</span><h3>{guarantee.cliente||work?.cliente||'Cliente sin nombre'}</h3><p className="mut">{guarantee.sistema||work?.sistema||'Sistema no especificado'} · Instalación {displayDate(guarantee.instalacion||work?.programacion)}</p></div><div className="warranty-dates"><span>Próximo mantenimiento</span><strong>{displayDate(guarantee.proximo_mtto)}</strong>{canRegisterMaintenance&&<button type="button" className="btn ghost" disabled={maintenanceBusy===guarantee.id} onClick={()=>markMaintenanceComplete(guarantee)}>{maintenanceBusy===guarantee.id?'Guardando…':'Registrar realizado'}</button>}</div></header>
      <div className="warranty-reports">
       <div className="row"><strong>Historial de reportes ({items.length})</strong>{canEdit&&<button type="button" className="btn" onClick={()=>beginCreate(guarantee)}>+ Nuevo reporte</button>}</div>
       {items.length?items.map(report=><div className="warranty-report-row" key={report.id}>
