@@ -118,7 +118,7 @@ function Libro({readOnly,canDelete}){
   const plazas=plazaRows.length?plazaRows.map(item=>item.nombre):['Morelos'];
   const income=sum(rows.filter(row=>row.tipo==='ingreso'),row=>row.monto);const expenses=sum(rows.filter(row=>row.tipo==='egreso'),row=>row.monto);
   const openReceipt=async path=>{setError('');const{data,error:urlError}=await sb.storage.from('comprobantes').createSignedUrl(path,120);if(urlError||!data?.signedUrl){setError(urlError?.message||'No se pudo abrir el comprobante.');return}window.open(data.signedUrl,'_blank','noopener')};
-  const remove=async row=>{if(!confirm('¿Eliminar este movimiento?'))return;setError('');setBusy(true);try{const{error:deleteError}=await sb.from('movimientos_financieros').delete().eq('id',row.id);if(deleteError)throw deleteError;if(row.comprobante_path)await sb.storage.from('comprobantes').remove([row.comprobante_path]);await load()}catch(err){setError(err.message||'No se pudo eliminar.')}finally{setBusy(false)}};
+  const remove=async row=>{if(!confirm('¿Eliminar este movimiento?'))return;setError('');setBusy(true);try{const{error:deleteError}=await sb.from('movimientos_financieros').delete().eq('id',row.id);if(deleteError)throw deleteError;if(row.comprobante_path){const{error:receiptError}=await sb.storage.from('comprobantes').remove([row.comprobante_path]);if(receiptError){setError(`El movimiento se eliminó, pero no se pudo borrar su comprobante: ${receiptError.message}`);await load();return}}await load()}catch(err){setError(err.message||'No se pudo eliminar.')}finally{setBusy(false)}};
   const exportCsv=async()=>{setError('');setBusy(true);try{await exportMonthCsv(month)}catch(err){setError(err.message)}finally{setBusy(false)}};
   return <div className="card tbl">
     <div className="row"><div style={{flex:1}}><span className="lbl">Libro</span><h3>Ingresos y egresos</h3></div><input type="month" aria-label="Mes" value={month} onChange={e=>e.target.value&&setMonth(e.target.value)}/><button type="button" className="btn ghost" disabled={busy} onClick={exportCsv}>Descargar para el contador (CSV)</button>{!readOnly&&<button type="button" className="btn" onClick={()=>setForm({})}>+ Movimiento</button>}</div>
@@ -188,12 +188,12 @@ function Categorias({readOnly}){
   </div>;
 }
 
-export function Finanzas({readOnly=false,canDelete=false}){
+export function Finanzas({readOnly=false,canDelete=false,canDeletePettyCash=canDelete}){
   const[sub,setSub]=useState('libro');
   const tabs=[['libro','Libro'],['caja','Caja chica'],['categorias','Categorías']];
   return <div className="finance-page"><div className="subtabs" role="tablist" aria-label="Finanzas">{tabs.map(([key,label])=><button key={key} type="button" role="tab" aria-selected={sub===key} className={sub===key?'on':''} onClick={()=>setSub(key)}>{label}</button>)}</div>
     {readOnly&&<p className="mut">Vista de solo lectura.</p>}
-    {sub==='libro'&&<Libro readOnly={readOnly} canDelete={canDelete}/>}{sub==='caja'&&<CajaChica readOnly={readOnly} canDelete={canDelete}/>}{sub==='categorias'&&<Categorias readOnly={readOnly}/>}</div>;
+    {sub==='libro'&&<Libro readOnly={readOnly} canDelete={canDelete}/>}{sub==='caja'&&<CajaChica readOnly={readOnly} canDelete={canDeletePettyCash}/>}{sub==='categorias'&&<Categorias readOnly={readOnly}/>}</div>;
 }
 
 /* ---------- Stock por medición (barriles) y artículos por reponer ---------- */

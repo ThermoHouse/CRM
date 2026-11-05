@@ -43,11 +43,11 @@ En las cotizaciones, **Sistema / presentación** usa una sola selección. El aju
 
 ## Permisos
 - `root`: todos los módulos, aprobación de usuarios y auditoría.
-- `sales`: dashboard comercial, todos los leads e Inbox; consulta mantenimiento y reportes técnicos de garantía en modo lectura y puede consultar precios. Solo puede editar/eliminar leads propios o asignados para seguimiento.
+- `sales`: dashboard comercial, todos los leads e Inbox; consulta mantenimiento y reportes técnicos de garantía, y puede crear/editar reportes que haya creado. Puede consultar precios. Solo puede editar/eliminar leads propios o asignados para seguimiento.
 - `operations`: visitas, instalaciones e inventario operativo.
-- `administrative`: lectura de todos los módulos; puede crear leads y editar tarifas, productos, inventario, visitas, instalaciones, cierres, finanzas y caja chica. No edita ni elimina leads existentes.
+- `administrative`: lectura de todos los módulos; puede crear leads y editar tarifas, productos, inventario, visitas, instalaciones, cierres, finanzas y caja chica. También puede eliminar movimientos del libro de ingresos/egresos, pero no de caja chica. No edita ni elimina leads existentes.
 - `manager` (gerente): consulta y reportes; puede crear leads, pero no editar ni eliminar registros existentes.
-- Gerente, Administrativo y Ventas pueden consultar y generar/abrir PDFs de reportes de garantía. Solo Administrativo y root pueden crear o editar reportes y adjuntos.
+- Gerente, Administrativo y Ventas pueden consultar y generar/abrir PDFs de reportes de garantía. Ventas crea y edita los que registró; Administrativo y root pueden crear y editar todos.
 
 Los cambios de filas se registran en `public.security_events`, visible solo para root. Los intentos de inicio de sesión fallidos se consultan en Supabase Auth Logs. Los rechazos de políticas RLS y eventos de infraestructura requieren un Log Drain para centralizarlos; no se pueden registrar de forma confiable desde el navegador. La bitácora de la app guarda metadatos, no el contenido completo de los registros.
 
@@ -127,7 +127,8 @@ Ejecuta en orden, después de `23_security_hardening.sql` y revisando antes cuá
 32. `32_applications_calendar_and_maintenance.sql`: calendario de aplicaciones y mantenimientos recurrentes cada 2, 3 o 4 años. Permite registrar una aplicación desde un lead con venta cerrada o capturar un nuevo cliente.
 33. `33_chemical_consumption_by_height.sql`: formulario de salidas de isocianato y resina por centímetros consumidos, historial y actualización automática de litros restantes y gráfica de mínimos de compra.
 34. `34_service_breakdowns.sql`: tabla `service_breakdowns` para guardar los "Desgloses de servicios profesionales" (pestaña **Desglose**, roles `root`, `sales`, `administrative` y `manager`). Es opcional: el formulario y el PDF funcionan sin ella; solo habilita Guardar y la lista de guardados. Ventas ve solo los suyos; root, administrativo y gerente ven todos.
-39. `39_warranty_report_workflow.sql`: historial de reportes técnicos de garantía, bucket privado para PDFs/fotografías y permisos de consulta para Ventas/Gerente; solo Administrativo y root pueden guardar o modificar reportes. Ejecutar al final, después de las migraciones `24`–`38`, incluida `32_applications_calendar_and_maintenance.sql`.
+39. `39_warranty_report_workflow.sql`: historial de reportes técnicos de garantía, bucket privado para PDFs/fotografías y permisos de consulta para Ventas/Gerente; inicialmente solo Administrativo y root podían guardar o modificar reportes. Ejecutar después de las migraciones `24`–`38`.
 40. `40_sales_all_leads_read.sql`: permite a Ventas consultar todos los leads sin ampliar permisos para editarlos/eliminarlos, registrar intentos de contacto ni consultar visitas/obras de leads ajenos.
+41. `41_sales_warranty_admin_finance_delete.sql`: permite a Ventas crear/editar sus propios reportes técnicos y adjuntos; permite a Administrativo eliminar movimientos del libro y sus comprobantes.
 
 Para dar el rol de gerente, root lo asigna desde **Usuarios** (Gerente · consulta y reportes). No requiere cambios en las Edge Functions ni nuevos secretos.

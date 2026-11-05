@@ -35,7 +35,7 @@ function createReportForm(guarantee,work,report){
  };
 }
 
-function WarrantyReports({canEdit}){
+function WarrantyReports({canEdit,canManageMaintenance=false,userId}){
  const[guarantees,setGuarantees]=useState([]);
  const[works,setWorks]=useState([]);
  const[reports,setReports]=useState([]);
@@ -52,6 +52,7 @@ function WarrantyReports({canEdit}){
   const grouped=groups.get(report.guarantee_id)||[];
   grouped.push(report);groups.set(report.guarantee_id,grouped);return groups;
  },new Map()),[reports]);
+ const canEditReport=report=>canEdit&&(canManageMaintenance||report.created_by===userId);
 
  const load=useCallback(async()=>{
   setLoading(true);setLoadError('');
@@ -157,7 +158,12 @@ function WarrantyReports({canEdit}){
    setForm(null);setMessage(cleanupWarning||'Reporte de garantía guardado.');
    if(cleanupWarning)setError(cleanupWarning);
    await load();
-  }catch(saveError){setError(saveError.message||'No se pudo guardar el reporte de garantía.')}
+  }catch(saveError){
+   const message=saveError.message||'No se pudo guardar el reporte de garantía.';
+   setError(saveError.code==='42501'||/row-level security|permission denied/i.test(message)
+    ?'Supabase rechazó el guardado. Ejecuta supabase/41_sales_warranty_admin_finance_delete.sql para habilitar a Ventas y vuelve a intentarlo.'
+    :message);
+  }
   finally{setBusy(false)}
  };
 
@@ -211,12 +217,12 @@ function WarrantyReports({canEdit}){
     const work=workById.get(guarantee.obra_id);
     const items=reportsByGuarantee.get(guarantee.id)||[];
     return <article className="card warranty-card" key={guarantee.id}>
-     <header className="warranty-card-heading"><div><span className="lbl">Instalación · {guarantee.folio||work?.folio||'Sin folio'}</span><h3>{guarantee.cliente||work?.cliente||'Cliente sin nombre'}</h3><p className="mut">{guarantee.sistema||work?.sistema||'Sistema no especificado'} · Instalación {displayDate(guarantee.instalacion||work?.programacion)}</p></div><div className="warranty-dates"><span>Próximo mantenimiento</span><strong>{displayDate(guarantee.proximo_mtto)}</strong>{canEdit&&<button type="button" className="btn ghost" disabled={maintenanceBusy===guarantee.id} onClick={()=>markMaintenanceComplete(guarantee)}>{maintenanceBusy===guarantee.id?'Guardando…':'Registrar realizado'}</button>}</div></header>
+     <header className="warranty-card-heading"><div><span className="lbl">Instalación · {guarantee.folio||work?.folio||'Sin folio'}</span><h3>{guarantee.cliente||work?.cliente||'Cliente sin nombre'}</h3><p className="mut">{guarantee.sistema||work?.sistema||'Sistema no especificado'} · Instalación {displayDate(guarantee.instalacion||work?.programacion)}</p></div><div className="warranty-dates"><span>Próximo mantenimiento</span><strong>{displayDate(guarantee.proximo_mtto)}</strong>{canManageMaintenance&&<button type="button" className="btn ghost" disabled={maintenanceBusy===guarantee.id} onClick={()=>markMaintenanceComplete(guarantee)}>{maintenanceBusy===guarantee.id?'Guardando…':'Registrar realizado'}</button>}</div></header>
      <div className="warranty-reports">
       <div className="row"><strong>Historial de reportes ({items.length})</strong>{canEdit&&<button type="button" className="btn" onClick={()=>beginCreate(guarantee)}>+ Nuevo reporte</button>}</div>
       {items.length?items.map(report=><div className="warranty-report-row" key={report.id}>
        <div><strong>{report.folio}</strong><span>{displayDate(report.fecha_visita)} · {report.tipo_visita}</span><small>{report.tecnico_responsable||'Técnico no asignado'} · {report.foto_paths?.filter(Boolean).length||0} evidencias</small></div>
-       <div className="row warranty-report-actions"><button type="button" className="btn ghost" disabled={pdfBusy===report.id} onClick={()=>generatePdf(report)}>{pdfBusy===report.id?'Generando…':'Generar PDF'}</button>{report.pdf_path&&<button type="button" className="btn ghost" onClick={()=>openAttachedPdf(report)}>Abrir PDF adjunto</button>}{canEdit&&<button type="button" className="btn ghost" onClick={()=>beginEdit(guarantee,report)}>Editar</button>}</div>
+       <div className="row warranty-report-actions"><button type="button" className="btn ghost" disabled={pdfBusy===report.id} onClick={()=>generatePdf(report)}>{pdfBusy===report.id?'Generando…':'Generar PDF'}</button>{report.pdf_path&&<button type="button" className="btn ghost" onClick={()=>openAttachedPdf(report)}>Abrir PDF adjunto</button>}{canEditReport(report)&&<button type="button" className="btn ghost" onClick={()=>beginEdit(guarantee,report)}>Editar</button>}</div>
       </div>):<p className="mut">Aún no hay reportes técnicos para esta garantía.</p>}
      </div>
     </article>
