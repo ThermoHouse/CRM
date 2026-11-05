@@ -40,7 +40,7 @@ export async function downloadWarrantyReportPdf(report,photoUrls=[]){
       .page{position:relative;box-sizing:border-box;width:203.2mm;min-height:257mm;padding:9mm 0 8mm;background:#fff}
       .page:before{content:"";position:absolute;top:0;left:0;width:100%;height:3mm;background:linear-gradient(90deg,#075895 0 72%,#f58220 72%)}
       .head{display:flex;align-items:center;justify-content:space-between;margin:1mm 0 6mm}
-      .logo{width:37mm;height:auto}
+      .logo{width:37mm;height:auto;background:#fff}
       .title{text-align:right}.title h1{font-size:17pt;line-height:1.12;color:#075895;margin:0 0 2mm}
       .title p{margin:0;color:#6b7b8b;font-size:8pt}
       table{border-collapse:collapse;width:100%;margin-bottom:5mm;font-size:8pt}
