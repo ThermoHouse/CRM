@@ -73,6 +73,7 @@ function quoteData(l) {
   const tax = Number(hasFiscalSnapshot ? l.iva : subtotal * 0.16);
   const grandTotal = Number(hasFiscalSnapshot ? l.total ?? subtotal + tax : subtotal + tax);
   const applicationAmount = Math.max(0, subtotal - extras);
+  const generatorCost = Number(l.costo_planta_luz || 0);
 
   const relevant = line => line.sistema || Number(line.destechado_m2) > 0 || Number(line.destechado_monto) > 0;
   const lines =
@@ -107,6 +108,7 @@ function quoteData(l) {
     grandTotal,
     applicationAmount,
     extras,
+    generatorCost,
     lines,
     area,
     destechadoArea,
@@ -158,7 +160,7 @@ export function drawQuote(doc, l, logo) {
 
   // ── Posiciones verticales ──
   const totalsTop = 206;
-  const totalsEnd = totalsTop + 5 * 14;
+  const totalsEnd = totalsTop + 6 * 14;
   const specHeadY = 212;
   const specY0 = 225;
   const specEnd = specY0 + (specLines.length - 1) * SPEC_LH + 6;
@@ -348,7 +350,8 @@ export function drawQuote(doc, l, logo) {
   // Totales
   [
     ['APLICACIÓN', money(d.applicationAmount), false],
-    ['AGREGADOS', money(d.extras), false],
+    ['AGREGADOS', money(d.extras - d.generatorCost), false],
+    ['PLANTA DE LUZ 220V', money(d.generatorCost), false],
     ['SUBTOTAL', money(d.subtotal), true],
     ['IVA', money(d.tax), false],
     ['TOTAL', money(d.grandTotal), true],
@@ -358,7 +361,7 @@ export function drawQuote(doc, l, logo) {
     text(label, 72, y + 7, {bold: true});
     text(value, 232, y + 7, {align: 'right', bold});
   });
-  checkbox(252, totalsTop + 3 * 14 + 7, d.tax > 0, 8);
+  checkbox(252, totalsTop + 4 * 14 + 7, d.tax > 0, 8);
 
   // Especificaciones (a la derecha de los totales)
   text('ESPECIFICACIONES', SPEC_X, specHeadY, {bold: true, size: 8.5});
