@@ -32,8 +32,9 @@ where email = 'root@empresa.com';
 21. Ejecuta `supabase/21_lead_price_adjustments.sql` para guardar precio base, ajuste por m², precio final y diferencia por cotización.
 22. Ejecuta `supabase/22_quote_document_fields.sql` para guardar los datos editables del formato de cotización PDF.
 23. Ejecuta `supabase/23_security_hardening.sql` después de aplicar las migraciones anteriores y antes de habilitar el registro público. En instalaciones existentes, aplícala cuanto antes después de `06`; elimina políticas permisivas heredadas sin borrar las políticas específicas por rol. Si la migración `06` aún no se había aplicado, aplícala primero para restablecer los permisos normales.
-24. En Supabase → Edge Functions → Secrets agrega `N8N_WEBHOOK_URL` y `N8N_WEBHOOK_SECRET` para que los vendedores puedan enviar WhatsApp desde el CRM.
-25. Local: configura `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, luego ejecuta `npm install` y `npm run dev`. En Vercel configura las mismas variables para los entornos que publiques.
+24. Ejecuta `supabase/42_lead_generator_cost.sql` para guardar por separado el costo de planta de luz de 220V e incluirlo en los totales de las cotizaciones.
+25. En Supabase → Edge Functions → Secrets agrega `N8N_WEBHOOK_URL` y `N8N_WEBHOOK_SECRET` para que los vendedores puedan enviar WhatsApp desde el CRM.
+26. Local: configura `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, luego ejecuta `npm install` y `npm run dev`. En Vercel configura las mismas variables para los entornos que publiques.
 
 En Leads, **Dueño de comisión** conserva el asesor original (`leads.asesor`); **Seguimiento a cargo de** es la persona que dará seguimiento (`leads.followup_assigned_to`). El banner del Dashboard y Leads avisa al dueño original cuando otro vendedor atiende su cliente. La agenda de hoy se agrupa por quien tiene asignado el seguimiento.
 

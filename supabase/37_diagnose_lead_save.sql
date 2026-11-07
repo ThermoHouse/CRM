@@ -34,6 +34,7 @@ with expected_columns(column_name) as (
     ('status'),
     ('next_call_at'),
     ('costo_logistico'),
+    ('costo_planta_luz'),
     ('notas'),
     ('descuento'),
     ('destechado_monto'),

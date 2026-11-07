@@ -45,7 +45,7 @@ Es el módulo principal de trabajo comercial. Permite consultar, crear y actuali
 
 La ficha/cotización contempla, entre otros datos:
 
-- Área, sistema o presentación, ciudad, tipo de precio y costos adicionales.
+- Área, sistema o presentación, ciudad, tipo de precio y costos adicionales, incluido el costo opcional de planta de luz para 220V.
 - Ajuste de precio por metro cuadrado, descuento, subtotal, IVA opcional y total.
 - Medio de contacto, aplicaciones, condiciones del techo, suministros y objetos en techo.
 - Especificaciones del servicio, observaciones y datos fiscales.
@@ -165,7 +165,7 @@ El esquema inicial se crea desde `supabase/schema.sql`. Después se aplican las 
 3. `05`–`07` habilitan solicitudes de acceso, perfiles, roles y promoción de root.
 4. `08`–`14` agregan plazas, seguimiento, directorio de ventas, agenda, correcciones de dashboard, perfiles y Gmail.
 5. `15`–`19` agregan WhatsApp, API del bot, intentos de contacto y asignación de seguimiento.
-6. `20`–`22` agregan tipo de cliente, ajustes de precio y datos del documento de cotización.
+6. `20`–`22` agregan tipo de cliente, ajustes de precio y datos del documento de cotización; `42` agrega el costo de planta de luz de 220V.
 
 Las integraciones de Edge Functions requieren también despliegue y configuración de secretos. Para variables locales y configuración de publicación, revisar la guía detallada en `README.md`. No ejecutar scripts de migración en una base ya existente sin comprobar antes el estado y las instrucciones de ese entorno.
 

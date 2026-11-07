@@ -65,7 +65,10 @@ function formatDate(value) {
 /** Replica los cálculos del reporte en pantalla (Report en App.jsx). */
 function quoteData(l) {
   const hasFiscalSnapshot = l.subtotal != null && l.iva != null;
-  const extras = Number(l.costo_logistico || 0) + Number(l.destechado_monto || 0);
+  const extras =
+    Number(l.costo_logistico || 0) +
+    Number(l.destechado_monto || 0) +
+    Number(l.costo_planta_luz || 0);
   const subtotal = Number(hasFiscalSnapshot ? l.subtotal : l.total ?? 0);
   const tax = Number(hasFiscalSnapshot ? l.iva : subtotal * 0.16);
   const grandTotal = Number(hasFiscalSnapshot ? l.total ?? subtotal + tax : subtotal + tax);

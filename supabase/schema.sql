@@ -3,6 +3,7 @@ create table leads(
  id uuid primary key default gen_random_uuid(), folio text, nombre text not null, whatsapp text, email text,
  fecha_nacimiento date, origen text, ciudad text default 'Cuernavaca', estado text, cp text, direccion text,
  area_m2 numeric default 0, tipo_precio text default 'efectivo', sistema text, costo_logistico numeric default 0,
+ costo_planta_luz numeric not null default 0,
  total numeric default 0, status text default 'nuevo' check (status in ('nuevo','contactado','visita','cerrado','rescatar','no')),
  asesor text, notas text, created_at timestamptz default now());
 create table bot_inbox(id uuid primary key default gen_random_uuid(), nombre text, telefono text, ciudad text,
