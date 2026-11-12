@@ -62,6 +62,10 @@ Otras acciones relacionadas incluyen:
 - Seleccionar y eliminar varios leads donde el rol lo permita.
 - Abrir WhatsApp para contactar al cliente.
 
+### Alarmas de seguimiento
+
+La campana del CRM avisa sobre llamadas próximas y citas. Con el CRM abierto, reproduce sonido en la pestaña; las notificaciones Web Push permiten recibir avisos del sistema con la página cerrada, si el usuario habilitó el permiso en ese navegador. Las push se programan desde Supabase y notifican al vendedor asignado al seguimiento o, si no existe asignación, al dueño del lead. Para una cita se notifica al dueño y al vendedor asignado. El sonido de las push depende de Windows y del navegador; la web no puede forzarlo cuando el sistema silencia notificaciones. Requiere `supabase/43_web_push_reminders.sql`, `supabase/44_schedule_web_push.sql`, las funciones Edge desplegadas y claves VAPID configuradas; consulta [README.md](./README.md#alarmas-push-de-llamadas-y-citas).
+
 ### Desglose de servicios profesionales
 
 Pestaña **Desglose** (roles `root`, `sales`, `administrative` y `manager`; también se abre desde el botón **Desglose** de cada fila en Leads). Formulario interactivo que genera el documento "Descripción detallada del servicio" para el cliente, como complemento de la cotización o de forma independiente.

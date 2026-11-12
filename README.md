@@ -36,6 +36,26 @@ where email = 'root@empresa.com';
 25. En Supabase → Edge Functions → Secrets agrega `N8N_WEBHOOK_URL` y `N8N_WEBHOOK_SECRET` para que los vendedores puedan enviar WhatsApp desde el CRM.
 26. Local: configura `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, luego ejecuta `npm install` y `npm run dev`. En Vercel configura las mismas variables para los entornos que publiques.
 
+## Alarmas push de llamadas y citas
+
+Las alarmas push pueden llegar aunque el CRM esté cerrado. El sonido es el predeterminado de Windows/navegador y puede silenciarse con No molestar o con los ajustes de notificaciones. Cada usuario debe activar los avisos en cada navegador/dispositivo. La app también conserva sus alarmas con sonido mientras está abierta.
+
+1. Ejecuta `supabase/43_web_push_reminders.sql` en Supabase SQL Editor.
+2. Genera un par de claves VAPID con `npx web-push generate-vapid-keys`. Configura `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (por ejemplo, `mailto:admin@tu-dominio.com`) y un secreto aleatorio de al menos 32 bytes para `REMINDER_CRON_SECRET` en Supabase → Edge Functions → Secrets. No publiques la clave privada ni el secreto del cron. `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` los proporciona Supabase al runtime.
+3. Agrega la clave pública VAPID como `VITE_WEB_PUSH_PUBLIC_KEY` en `.env.local` y en las variables de entorno de Vercel. Reinicia `npm run dev` o vuelve a desplegar Vercel para que se incorpore al frontend.
+4. Despliega `supabase/functions/reminder-push` y `supabase/functions/dispatch-reminders` con `supabase functions deploy reminder-push` y `supabase functions deploy dispatch-reminders --no-verify-jwt`. La segunda función valida `REMINDER_CRON_SECRET` en cada solicitud.
+5. En SQL Editor, guarda la URL del proyecto y el mismo secreto del cron en Supabase Vault:
+
+```sql
+select vault.create_secret('https://<project-ref>.supabase.co', 'reminder_project_url');
+select vault.create_secret('<el mismo valor de REMINDER_CRON_SECRET>', 'reminder_cron_secret');
+```
+
+6. Ejecuta `supabase/44_schedule_web_push.sql`. Programa la revisión cada minuto; los minutos de anticipación elegidos en la campana se aplican también a las notificaciones push.
+7. Abre el CRM, pulsa la campana y elige **Activar avisos con CRM cerrado**. Acepta el permiso del navegador. La suscripción se guarda por cuenta y navegador; las llamadas se envían al vendedor asignado al seguimiento o, si no hay uno, al dueño del lead. Las citas se envían al dueño y al vendedor asignado.
+
+Se requiere HTTPS (localhost sirve para desarrollo), conexión a internet y permiso de notificaciones. Si el navegador tiene una opción para continuar ejecutándose en segundo plano, debe estar habilitada para recibir avisos con todas las ventanas cerradas. Windows, el navegador o el modo No molestar pueden silenciar el sonido del sistema. Los avisos push no reproducen un sonido personalizado de la página y no pueden garantizar audio si el sistema operativo silencia las notificaciones. Limita el acceso a la base de datos: `pg_net` conserva temporalmente las cabeceras HTTP en su cola de solicitudes.
+
 En Leads, **Dueño de comisión** conserva el asesor original (`leads.asesor`); **Seguimiento a cargo de** es la persona que dará seguimiento (`leads.followup_assigned_to`). El banner del Dashboard y Leads avisa al dueño original cuando otro vendedor atiende su cliente. La agenda de hoy se agrupa por quien tiene asignado el seguimiento.
 
 En Leads, **Tipo de cliente** usa `leads.tipo_aplicacion`: `Residencial` o `Empresarial`. Los datos importados conservan su valor; los registros sin clasificación se pueden actualizar desde la fila y filtrar como **Sin clasificar**.

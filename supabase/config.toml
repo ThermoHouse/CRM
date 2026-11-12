@@ -3,3 +3,9 @@ verify_jwt = false
 
 [functions.crm-conversations]
 verify_jwt = true
+
+[functions.reminder-push]
+verify_jwt = true
+
+[functions.dispatch-reminders]
+verify_jwt = false

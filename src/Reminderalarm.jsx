@@ -16,6 +16,25 @@ const STORE_KEY = 'crm_alarm_state_v1';
 const PREF_KEY = 'crm_alarm_prefs_v1';
 const GRACE_MIN = 360; // si abres el CRM tarde, sigue avisando hasta 6 h después de la hora
 const advisorKey = value => String(value || '').trim().toLowerCase();
+const vapidPublicKey = import.meta.env.VITE_WEB_PUSH_PUBLIC_KEY;
+
+const decodeVapidKey = value => {
+  const padded = value + '='.repeat((4 - value.length % 4) % 4);
+  const decoded = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(decoded, character => character.charCodeAt(0));
+};
+
+async function savePushSubscription(subscription, settings) {
+  const { error } = await sb.functions.invoke('reminder-push', {
+    body: {
+      action: 'subscribe',
+      subscription: subscription.toJSON(),
+      enabled: settings.enabled,
+      before_minutes: settings.before,
+    },
+  });
+  if (error) throw new Error(error.message || 'No se pudo guardar la suscripción push.');
+}
 
 const readJSON = (key, fallback) => {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
@@ -88,6 +107,12 @@ export default function ReminderAlarm({ userId, userEmail, onOpenLeads }) {
   const [prefs, setPrefs] = useState(() => ({ enabled: true, before: 10, ...readJSON(PREF_KEY, {}) }));
   const [panel, setPanel] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
+  const [audioMessage, setAudioMessage] = useState('');
+  const [notificationMessage, setNotificationMessage] = useState('');
+  const [pushReady, setPushReady] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushMessage, setPushMessage] = useState('');
+  const [pushEndpoint, setPushEndpoint] = useState('');
   const notified = useRef(new Set());
   const hasAppointmentColumn = useRef(true);
 
@@ -106,7 +131,10 @@ export default function ReminderAlarm({ userId, userEmail, onOpenLeads }) {
 
   // El navegador solo deja sonar audio después de un clic/toque: lo desbloqueamos con el primero.
   useEffect(() => {
-    const unlock = () => { if (unlockAudio()?.state === 'running') setAudioReady(true); };
+    const unlock = () => {
+      const ctx = unlockAudio();
+      if (ctx?.state === 'running') setAudioReady(true);
+    };
     window.addEventListener('pointerdown', unlock);
     window.addEventListener('keydown', unlock);
     return () => { window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock); };
@@ -155,6 +183,47 @@ export default function ReminderAlarm({ userId, userEmail, onOpenLeads }) {
     window.addEventListener('focus', onVisible);
     return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('focus', onVisible); };
   }, [load]);
+
+  useEffect(() => {
+    let active = true;
+    const restoreSubscription = async () => {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+      try {
+        const registration = await navigator.serviceWorker.getRegistration();
+        const subscription = await registration?.pushManager.getSubscription();
+        if (!subscription || !active) return;
+        await savePushSubscription(subscription, prefs);
+        if (active) {
+          setPushReady(true);
+          setPushEndpoint(subscription.endpoint);
+          setPushMessage('Avisos en segundo plano activos en este navegador.');
+        }
+      } catch (error) {
+        if (active) setPushMessage(error.message || 'No se pudo restaurar la suscripción push.');
+      }
+    };
+    restoreSubscription();
+    return () => { active = false; };
+  }, [userId]);
+
+  useEffect(() => {
+    if (!pushReady) return undefined;
+    let active = true;
+    sb.functions.invoke('reminder-push', {
+      body: {
+        action: 'settings',
+        endpoint: pushEndpoint,
+        enabled: prefs.enabled,
+        before_minutes: prefs.before,
+      },
+    }).then(({ error }) => {
+      if (!active) return;
+      if (error) setPushMessage(error.message || 'No se pudieron sincronizar las preferencias push.');
+    }).catch(error => {
+      if (active) setPushMessage(error.message || 'No se pudieron sincronizar las preferencias push.');
+    });
+    return () => { active = false; };
+  }, [prefs.enabled, prefs.before, pushReady, pushEndpoint]);
 
   // Eventos que me tocan a mí
   const events = useMemo(() => {
@@ -216,11 +285,100 @@ export default function ReminderAlarm({ userId, userEmail, onOpenLeads }) {
   const dismissAll = () => updateState(current => { due.forEach(event => { current[event.key] = { done: true }; }); return current; });
 
   const activate = async () => {
+  try {
     const ctx = unlockAudio();
-    if (ctx?.state === 'running') setAudioReady(true);
-    ringOnce();
-    if ('Notification' in window && Notification.permission === 'default') {
-      try { await Notification.requestPermission(); } catch { /* ignorar */ }
+    if (!ctx) {
+      setAudioReady(false);
+      setAudioMessage('Este navegador no permite reproducir el sonido de alarma.');
+    } else {
+      if (ctx.state === 'suspended') await ctx.resume();
+      if (ctx.state === 'running' && ringOnce()) {
+        setAudioReady(true);
+        setAudioMessage('Sonido activado. Si no se escucha, revisa el volumen y el permiso de sonido de esta pestaña.');
+      } else {
+        setAudioReady(false);
+        setAudioMessage('No se pudo activar el sonido. Vuelve a pulsar este botón y revisa el volumen del navegador.');
+      }
+    }
+  } catch {
+    setAudioReady(false);
+    setAudioMessage('El navegador bloqueó el sonido. Pulsa de nuevo para permitirlo y revisa el volumen.');
+  }
+
+  if (!('Notification' in window)) {
+    setNotificationMessage('Este navegador no admite notificaciones del sistema.');
+    return;
+  }
+  if (Notification.permission === 'default') {
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationMessage(permission === 'granted'
+        ? 'Notificaciones del sistema activadas.'
+        : 'El permiso de notificaciones fue rechazado; puedes habilitarlo en los ajustes del navegador.');
+    } catch {
+      setNotificationMessage('No se pudo solicitar el permiso de notificaciones.');
+    }
+  } else {
+    setNotificationMessage(Notification.permission === 'granted'
+      ? 'Notificaciones del sistema activadas.'
+      : 'Las notificaciones están bloqueadas en los ajustes del navegador.');
+  }
+  };
+
+  const enablePush = async () => {
+    setPushBusy(true);
+    setPushMessage('');
+    try {
+      if (!window.isSecureContext) throw new Error('Las notificaciones push requieren localhost o una conexión HTTPS.');
+      if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+        throw new Error('Este navegador no admite notificaciones push.');
+      }
+      if (!vapidPublicKey) throw new Error('Falta configurar VITE_WEB_PUSH_PUBLIC_KEY para este entorno.');
+      const permission = Notification.permission === 'granted'
+        ? 'granted'
+        : await Notification.requestPermission();
+      if (permission !== 'granted') throw new Error('Permite las notificaciones del sitio en los ajustes del navegador.');
+
+      const registration = await navigator.serviceWorker.register('/push-sw.js');
+      const ready = await navigator.serviceWorker.ready;
+      let subscription = await ready.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: decodeVapidKey(vapidPublicKey),
+        });
+      }
+      await savePushSubscription(subscription, prefs);
+      setPushReady(true);
+      setPushEndpoint(subscription.endpoint);
+      setPushMessage('Avisos push activados. El sonido depende de los ajustes de notificaciones del sistema.');
+    } catch (error) {
+      setPushMessage(error.message || 'No se pudieron activar los avisos push.');
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
+  const disablePush = async () => {
+    setPushBusy(true);
+    setPushMessage('');
+    try {
+      const registration = await navigator.serviceWorker.getRegistration();
+      const subscription = await registration?.pushManager.getSubscription();
+      if (subscription) {
+        const { error } = await sb.functions.invoke('reminder-push', {
+          body: { action: 'unsubscribe', endpoint: subscription.endpoint },
+        });
+        if (error) throw new Error(error.message || 'No se pudo eliminar la suscripción del servidor.');
+        await subscription.unsubscribe();
+      }
+      setPushReady(false);
+      setPushEndpoint('');
+      setPushMessage('Avisos en segundo plano desactivados en este navegador.');
+    } catch (error) {
+      setPushMessage(error.message || 'No se pudieron desactivar los avisos push.');
+    } finally {
+      setPushBusy(false);
     }
   };
 
@@ -283,9 +441,16 @@ export default function ReminderAlarm({ userId, userEmail, onOpenLeads }) {
               </select>
             </label>
             <button type="button" className="btn" onClick={activate}>{audioReady ? 'Probar sonido' : 'Activar sonido y avisos'}</button>
+            {audioMessage && <small role="status">{audioMessage}</small>}
+            {notificationMessage && <small role="status">{notificationMessage}</small>}
+            <button type="button" className="btn ghost" disabled={pushBusy} onClick={pushReady ? disablePush : enablePush}>
+              {pushBusy ? 'Configurando…' : pushReady ? 'Desactivar avisos con CRM cerrado' : 'Activar avisos con CRM cerrado'}
+            </button>
+            {pushMessage && <small role="status">{pushMessage}</small>}
             <small>
               {upcoming ? `${upcoming} alarma(s) próxima(s) en los siguientes 3 días. ` : 'No tienes alarmas próximas. '}
-              Programa una "Próxima llamada" o una cita en el cliente y sonará aquí. Mantén el CRM abierto en una pestaña y el volumen activado.
+              Programa una "Próxima llamada" o una cita en el cliente. Para que el sonido funcione, deja el CRM abierto en una pestaña y el volumen activado.
+              Si cierras el CRM, el navegador ya no puede ejecutar estas alarmas; para eso se requiere configurar notificaciones push desde el servidor.
             </small>
           </div>
         )}
