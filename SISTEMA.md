@@ -23,9 +23,9 @@ Los roles del CRM son:
 | Rol | Acceso funcional |
 |---|---|
 | `root` | Todos los módulos; administración de usuarios, plazas y auditoría. |
-| `sales` | Dashboard comercial, Leads, Desglose, Inbox Bot y Perfil. Ve todos los leads; solo puede editar/eliminar los que le pertenecen o tiene asignados para seguimiento. |
+| `sales` | Dashboard comercial, Leads, Desglose y Perfil. Ve todos los leads; solo puede editar/eliminar los que le pertenecen o tiene asignados para seguimiento. |
 | `operations` | Visitas, Instalaciones, Mantenimiento, Inventario y Perfil. |
-| `administrative` | Consulta de todos los módulos; puede crear leads y administra precios, productos, inventario, visitas, instalaciones, cierres, finanzas y caja chica. No edita ni elimina leads existentes. Inbox Bot es de solo lectura. |
+| `administrative` | Consulta de los módulos habilitados; puede crear leads y administra precios, productos, inventario, visitas, instalaciones, cierres, finanzas y caja chica. No edita ni elimina leads existentes. |
 | `manager` | Gerente: consulta y reportes; puede crear leads, pero no editar ni eliminar registros existentes. |
 
 La interfaz oculta los módulos no autorizados y pone en modo de solo lectura las pantallas correspondientes. Ventas consulta todos los leads, pero las políticas RLS conservan edición y eliminación solo para leads propios/asignados y restringen el registro de intentos de contacto. Requiere `supabase/40_sales_all_leads_read.sql`. La seguridad de los datos no depende solo de la interfaz: las migraciones configuran RLS y funciones/políticas en PostgreSQL. El esquema base y la migración de solicitudes de acceso dejan las tablas sin acceso hasta que la migración de roles instale políticas específicas; la migración 23 elimina políticas permisivas heredadas. La asignación de roles se realiza desde **Usuarios** para root. El primer root debe asignarse explícitamente siguiendo las instrucciones del README; el sistema no lo elige automáticamente por ser la única cuenta.
@@ -75,9 +75,9 @@ Pestaña **Desglose** (roles `root`, `sales`, `administrative` y `manager`; tamb
 - **Guardar** usa la tabla `service_breakdowns` (migración 34, opcional). El borrador se conserva en la sesión del navegador al cambiar de pestaña.
 - Archivos: `src/ServiceBreakdown.jsx`, `src/breakdownPdf.js`, `supabase/34_service_breakdowns.sql`.
 
-### Inbox Bot
+### Inbox Bot (temporalmente oculto)
 
-En la interfaz actual, **Inbox Bot** es una lista operativa de entradas recibidas por el bot. Se pueden revisar o actualizar y convertir una entrada en lead; al convertirla se crea/actualiza el lead y se marca la entrada como convertida.
+La sección está temporalmente oculta en la navegación del CRM. Se conservan la tabla y los datos de `bot_inbox`; la pantalla se puede volver a habilitar posteriormente.
 
 Este módulo no es lo mismo que la API completa de conversaciones de WhatsApp: el repositorio también contiene tablas y Edge Functions para almacenar mensajes/eventos y una API autenticada para que vendedores consulten conversaciones y envíen mensajes.
 

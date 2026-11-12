@@ -1,0 +1,16 @@
+PANTALLA "HOY" PARA VENTAS
+
+Requiere haber aplicado antes el paquete de alertas (src/LeadAlerts.jsx, src/leadAlerts.js, SQL 43).
+No hay migración nueva.
+
+1) Copia sobre tu proyecto (respetando rutas): src/App.jsx y src/SalesToday.jsx
+2) Entra como vendedor: abre directo en "Hoy".
+   Nav del vendedor: Hoy · Leads · Más (Más = Mi dashboard, Desglose, Mantenimiento). Inbox Bot está temporalmente oculto.
+3) Root, Administrativo, Gerente y Operaciones no cambian.
+
+Comportamiento:
+- Contadores: llamadas de hoy, vencidas (+24 h) y abandonados (14+ días). Tocar uno filtra la lista.
+- Lista: 10 leads más urgentes (vencidas > llamadas de hoy > abandonados > semáforo). "Ver todos" muestra el resto.
+- Llamar abre el marcador; WhatsApp abre wa.me y registra un intento de WhatsApp;
+  "Registrar intento" guarda una llamada en un toque. El lead registrado baja al final de la lista.
+- Solo se muestran los leads del vendedor (asesor = su correo o seguimiento asignado a él).
