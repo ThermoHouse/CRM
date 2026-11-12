@@ -3,7 +3,7 @@ import Applications from './Applications';
 import ServiceBreakdown from './ServiceBreakdown';
 import WarrantyReports from './WarrantyReports';
 import LeadAlerts from './LeadAlertsView';
-import ReminderAlarm from './ReminderAlarm';
+import ReminderAlarm from './Reminderalarm';
 import SalesToday from './SalesToday';
 import {buildLeadSpecifications,presentationLabel} from './leadPresentations';
 const ROLE_TABS={root:['Dashboard','Leads','Desglose','Visitas','Instalaciones','Cierres','Mantenimiento','Precios','Inventario','Finanzas','Reportes','Usuarios','Auditoría','Perfil'],sales:['Hoy','Más','Dashboard','Leads','Desglose','Mantenimiento','Perfil'],operations:['Visitas','Instalaciones','Inventario','Perfil'],administrative:['Dashboard','Leads','Desglose','Visitas','Instalaciones','Cierres','Mantenimiento','Precios','Inventario','Finanzas','Reportes','Perfil'],manager:['Dashboard','Leads','Desglose','Visitas','Instalaciones','Cierres','Mantenimiento','Precios','Inventario','Finanzas','Reportes','Perfil']};

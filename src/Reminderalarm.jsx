@@ -82,6 +82,7 @@ const CSS = `
 
 export default function ReminderAlarm({ userId, userEmail, onOpenLeads }) {
   const [leads, setLeads] = useState([]);
+  const [loadError, setLoadError] = useState('');
   const [now, setNow] = useState(Date.now());
   const [state, setState] = useState(() => readJSON(STORE_KEY, {}));
   const [prefs, setPrefs] = useState(() => ({ enabled: true, before: 10, ...readJSON(PREF_KEY, {}) }));
@@ -127,12 +128,23 @@ export default function ReminderAlarm({ userId, userEmail, onOpenLeads }) {
     let query = hasAppointmentColumn.current
       ? sb.from('leads').select(columns).or(`${window_('next_call_at')},${window_('appointment_at')}`)
       : sb.from('leads').select(legacyColumns).gte('next_call_at', from).lte('next_call_at', to);
-    let { data, error } = await query.limit(500);
-    if (error && hasAppointmentColumn.current && /appointment/i.test(error.message || '')) {
-      hasAppointmentColumn.current = false;
-      ({ data, error } = await sb.from('leads').select(legacyColumns).gte('next_call_at', from).lte('next_call_at', to).limit(500));
+    try {
+      let { data, error } = await query.limit(500);
+      if (error && hasAppointmentColumn.current && /appointment/i.test(error.message || '')) {
+        hasAppointmentColumn.current = false;
+        ({ data, error } = await sb.from('leads').select(legacyColumns).gte('next_call_at', from).lte('next_call_at', to).limit(500));
+      }
+      if (error) {
+        setLeads([]);
+        setLoadError(error.message || 'No se pudieron consultar los seguimientos.');
+        return;
+      }
+      setLeads(data || []);
+      setLoadError('');
+    } catch (error) {
+      setLeads([]);
+      setLoadError(error.message || 'No se pudieron consultar los seguimientos.');
     }
-    if (!error) setLeads(data || []);
   }, []);
 
   useEffect(() => {
@@ -253,6 +265,8 @@ export default function ReminderAlarm({ userId, userEmail, onOpenLeads }) {
       <div className="alarm-fab">
         {panel && (
           <div className="alarm-panel">
+            {loadError && <p className="data-alert" role="alert">No se pudieron cargar las alarmas: {loadError}</p>}
+            {!loadError && !hasAppointmentColumn.current && <p className="migration-hint" role="status">Las alarmas de citas no están disponibles. Ejecuta <code>supabase/12_calendar_appointments.sql</code> en Supabase.</p>}
             <label>
               <span>Alarmas activadas</span>
               <input type="checkbox" checked={prefs.enabled} onChange={event => updatePrefs({ enabled: event.target.checked })} />
@@ -275,7 +289,7 @@ export default function ReminderAlarm({ userId, userEmail, onOpenLeads }) {
             </small>
           </div>
         )}
-        <button type="button" className={`alarm-fab-btn ${due.length ? 'ringing' : ''}`} onClick={() => { setPanel(open => !open); activate(); }} aria-label="Alarmas del CRM">
+        <button type="button" className={`alarm-fab-btn ${due.length ? 'ringing' : ''}`} onClick={() => { setPanel(open => !open); activate(); }} aria-label={loadError ? 'Error al cargar las alarmas del CRM' : 'Alarmas del CRM'} title={loadError || 'Alarmas del CRM'}>
           {prefs.enabled ? '🔔' : '🔕'} {upcoming > 0 ? upcoming : ''}
         </button>
       </div>
