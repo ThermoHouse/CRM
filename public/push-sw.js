@@ -15,6 +15,8 @@ self.addEventListener('push', event => {
     tag: payload.tag || 'crm-lead-reminder',
     renotify: true,
     requireInteraction: true,
+    silent: false,
+    vibrate: [300, 150, 300],
     data: { url: payload.url || '/' },
   };
 
