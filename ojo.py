@@ -12,7 +12,7 @@ from matplotlib.animation import FuncAnimation
 from matplotlib import font_manager
 from PIL import Image, ImageDraw, ImageFont
 
-TEXTO = "Prestame un 100"
+TEXTO = "te amo princesa muaa"
 N_PUNTOS = 2400          # cantidad de números que forman el ojo
 RADIO_PUPILA = 0.30
 RADIO_IRIS = 0.42

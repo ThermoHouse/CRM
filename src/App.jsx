@@ -1,4 +1,4 @@
-import {useEffect,useState,useCallback} from 'react';import {sb} from './supabase';import {downloadQuotePdf} from './quotePdf';import {Cierres,Finanzas,Reportes,StockMedicion} from './finance';
+import {useEffect,useState,useCallback} from 'react';import {sb} from './supabase';import {downloadQuotePdf} from './quotePdf';import {Cierres,FinanceChangeRequests,Finanzas,Reportes,StockMedicion} from './finance';
 import Applications from './Applications';
 import ServiceBreakdown from './ServiceBreakdown';
 import WarrantyReports from './WarrantyReports';
@@ -6,7 +6,7 @@ import LeadAlerts from './LeadAlertsView';
 import ReminderAlarm from './Reminderalarm';
 import SalesToday from './SalesToday';
 import {buildLeadSpecifications,presentationLabel} from './leadPresentations';
-const ROLE_TABS={root:['Dashboard','Leads','Desglose','Visitas','Instalaciones','Cierres','Mantenimiento','Precios','Inventario','Finanzas','Reportes','Usuarios','Auditoría','Perfil'],sales:['Hoy','Más','Dashboard','Leads','Desglose','Mantenimiento','Perfil'],operations:['Visitas','Instalaciones','Inventario','Perfil'],administrative:['Dashboard','Leads','Desglose','Visitas','Instalaciones','Cierres','Mantenimiento','Precios','Inventario','Finanzas','Reportes','Perfil'],manager:['Dashboard','Leads','Desglose','Visitas','Instalaciones','Cierres','Mantenimiento','Precios','Inventario','Finanzas','Reportes','Perfil']};
+const ROLE_TABS={root:['Dashboard','Leads','Desglose','Visitas','Instalaciones','Cierres','Mantenimiento','Precios','Inventario','Finanzas','Solicitudes','Reportes','Usuarios','Auditoría','Perfil'],sales:['Hoy','Más','Dashboard','Leads','Desglose','Mantenimiento','Perfil'],operations:['Visitas','Instalaciones','Inventario','Perfil'],administrative:['Dashboard','Leads','Desglose','Visitas','Instalaciones','Cierres','Mantenimiento','Precios','Inventario','Finanzas','Solicitudes','Reportes','Perfil'],manager:['Dashboard','Leads','Desglose','Visitas','Instalaciones','Cierres','Mantenimiento','Precios','Inventario','Finanzas','Solicitudes','Reportes','Perfil']};
 const ROLE_LABELS={root:'Root',sales:'Ventas',operations:'Operaciones',administrative:'Administrativo',manager:'Gerente'};
 const ASSIGNABLE_ROLES=[['','Pendiente · sin acceso'],['sales','Ventas'],['operations','Operaciones'],['administrative','Administrativo'],['manager','Gerente · consulta y reportes + alta de leads'],['root','Root']];
 const STAT=['nuevo','sin_respuesta','interesado','en_proceso','confirmado','llamar_despues','contactado','visita','visitado','cerrado','rescatar','no'];
@@ -250,7 +250,7 @@ export default function App(){const[s,setS]=useState(null);const[authReady,setAu
  Mantenimiento:<WarrantyReports canEdit={role==='administrative'||role==='root'||role==='sales'} canManageMaintenance={role==='administrative'||role==='root'} canRegisterMaintenance={role==='administrative'||role==='root'||role==='sales'} userId={s.user.id}/>,
  Precios:<Precios readOnly={!canManageAdministration}/>,
  Inventario:<><InventoryCrud readOnly={!canManageOperations&&!canManageAdministration}/><StockMedicion canMeasure={canManageOperations||canManageAdministration} canConfigure={canManageAdministration}/><Crud table="articulos_inventario" title="EPP, herramientas y consumibles" order="created_at" readOnly={!canManageAdministration} defaults={{tipo:'epp',cantidad:0,minimo:0,unidad:'pieza',plaza:'Morelos'}} fields={[['nombre','Artículo'],['tipo','Tipo','select',['epp','herramienta','consumible','otro']],['cantidad','Cantidad','number'],['minimo','Mínimo','number'],['unidad','Unidad'],['plaza','Plaza'],['notas','Notas']]}/></>,
- Cierres:<Cierres readOnly={!canManageAdministration}/>,Finanzas:<Finanzas readOnly={!canManageAdministration} canDelete={role==='root'||role==='administrative'} canDeletePettyCash={role==='root'}/>,Reportes:<Reportes/>,
+ Cierres:<Cierres readOnly={!canManageAdministration}/>,Finanzas:<Finanzas readOnly={!canManageAdministration} canDelete={role==='root'} canDeletePettyCash={role==='root'} canRequestChanges={role==='administrative'}/>,Solicitudes:<FinanceChangeRequests role={role}/>,Reportes:<Reportes/>,
  Usuarios:<RootUsers currentUserId={s.user.id}/>,
  Perfil:<UserProfile user={s.user} profile={profile} onUpdated={setProfile}/>,
  Auditoría:<RootAudit/>};

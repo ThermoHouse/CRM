@@ -17,6 +17,10 @@ const PREF_KEY = 'crm_alarm_prefs_v1';
 const GRACE_MIN = 360; // si abres el CRM tarde, sigue avisando hasta 6 h después de la hora
 const advisorKey = value => String(value || '').trim().toLowerCase();
 const vapidPublicKey = import.meta.env.VITE_WEB_PUSH_PUBLIC_KEY;
+const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isInstalledApp = () => window.matchMedia('(display-mode: standalone)').matches
+  || navigator.standalone === true;
 
 const decodeVapidKey = value => {
   const padded = value + '='.repeat((4 - value.length % 4) % 4);
@@ -331,7 +335,13 @@ export default function ReminderAlarm({ userId, userEmail, onOpenLeads }) {
     try {
       if (!window.isSecureContext) throw new Error('Las notificaciones push requieren localhost o una conexión HTTPS.');
       if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
-        throw new Error('Este navegador no admite notificaciones push.');
+        if (isIOS() && !isInstalledApp()) {
+          throw new Error('En iPhone/iPad, abre el CRM en Safari, toca Compartir → Añadir a pantalla de inicio y luego ábrelo desde ese icono. Web Push requiere iOS/iPadOS 16.4 o posterior.');
+        }
+        if (isIOS()) {
+          throw new Error('Este iPhone/iPad no expone Web Push. Actualiza a iOS/iPadOS 16.4 o posterior y abre el CRM desde su icono en la pantalla de inicio.');
+        }
+        throw new Error('Este navegador no admite Web Push. Prueba con la versión reciente de Safari, Chrome o Edge en HTTPS.');
       }
       if (!vapidPublicKey) throw new Error('Falta configurar VITE_WEB_PUSH_PUBLIC_KEY para este entorno.');
       const permission = Notification.permission === 'granted'

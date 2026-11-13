@@ -27,7 +27,7 @@ const Kpi=({label,value,tone})=><div className={'card kpi'+(tone?' '+tone:'')}><
 
 async function exportMonthCsv(month){
   const[from,to]=monthRange(month);
-  const{data,error}=await sb.from('movimientos_financieros').select('*, finanzas_categorias(nombre,naturaleza)').gte('fecha',from).lt('fecha',to).order('fecha');
+  const{data,error}=await sb.from('movimientos_financieros_vigentes').select('*, finanzas_categorias(nombre,naturaleza)').gte('fecha',from).lt('fecha',to).order('fecha');
   if(error)throw error;
   if(!data.length)throw new Error('No hay movimientos en ese mes.');
   downloadCsv(`ingresos-egresos-${month}.csv`,['Fecha','Tipo','Categoría','Fijo/Variable','Concepto','Monto','Plaza','Método de pago','Origen','Comprobante'],
@@ -82,19 +82,22 @@ export function Cierres({readOnly=false}){
 }
 
 /* ---------- Libro de ingresos y egresos ---------- */
-function MovementForm({categorias,plazas,initial,onClose,onSaved}){
+function MovementForm({categorias,plazas,initial,onClose,onSaved,requestOnly=false}){
   const editing=Boolean(initial?.id);
   const[form,setForm]=useState(()=>({fecha:initial?.fecha||todayInput(),tipo:initial?.tipo||'egreso',categoria_id:initial?.categoria_id||'',monto:initial?.monto??'',concepto:initial?.concepto||'',plaza:initial?.plaza||plazas[0]||'Morelos',metodo_pago:initial?.metodo_pago||''}));
-  const[file,setFile]=useState(null);const[busy,setBusy]=useState(false);const[error,setError]=useState('');
+  const[file,setFile]=useState(null);const[reason,setReason]=useState('');const[busy,setBusy]=useState(false);const[error,setError]=useState('');
   const options=categorias.filter(item=>item.tipo===form.tipo&&(item.activa||item.id===form.categoria_id));
   const set=key=>event=>setForm(current=>({...current,[key]:event.target.value,...(key==='tipo'?{categoria_id:''}:{})}));
   const save=async event=>{event.preventDefault();setError('');setBusy(true);let uploaded=null;try{
-    if(file){const safe=file.name.replace(/[^\w.\-]+/g,'_').slice(-80);uploaded=`${form.fecha.slice(0,7)}/${Date.now()}-${safe}`;const{error:uploadError}=await sb.storage.from('comprobantes').upload(uploaded,file,{contentType:file.type});if(uploadError)throw uploadError}
+    if(requestOnly&&!reason.trim())throw new Error('Escribe el motivo de la solicitud.');
+    if(file&&!requestOnly){const safe=file.name.replace(/[^\w.\-]+/g,'_').slice(-80);uploaded=`${form.fecha.slice(0,7)}/${Date.now()}-${safe}`;const{error:uploadError}=await sb.storage.from('comprobantes').upload(uploaded,file,{contentType:file.type});if(uploadError)throw uploadError}
     const row={fecha:form.fecha,tipo:form.tipo,categoria_id:form.categoria_id,monto:Number(form.monto),concepto:form.concepto.trim()||null,plaza:form.plaza,metodo_pago:form.metodo_pago||null,...(uploaded?{comprobante_path:uploaded}:{})};
-    const{error:saveError}=editing?await sb.from('movimientos_financieros').update(row).eq('id',initial.id):await sb.from('movimientos_financieros').insert(row);
+    const{error:saveError}=requestOnly
+      ?await sb.rpc('submit_finance_change_request',{p_source_table:'movimientos_financieros',p_source_id:initial.id,p_action:'update',p_reason:reason.trim(),p_proposed_data:row})
+      :editing?await sb.from('movimientos_financieros').update(row).eq('id',initial.id):await sb.from('movimientos_financieros').insert(row);
     if(saveError)throw saveError;await onSaved()}catch(err){if(uploaded)await sb.storage.from('comprobantes').remove([uploaded]);setError(err.message||'No se pudo guardar el movimiento.')}finally{setBusy(false)}};
   return <div className="modal"><form className="card appointment-form" onSubmit={save}>
-    <div className="row"><h3 style={{flex:1}}>{editing?'Editar movimiento':'Nuevo movimiento'}</h3><button type="button" className="btn ghost" disabled={busy} onClick={onClose}>✕</button></div>
+    <div className="row"><h3 style={{flex:1}}>{requestOnly?'Solicitar corrección':editing?'Editar movimiento':'Nuevo movimiento'}</h3><button type="button" className="btn ghost" disabled={busy} onClick={onClose}>✕</button></div>
     <label htmlFor="mv-tipo">Tipo</label><select id="mv-tipo" value={form.tipo} onChange={set('tipo')}><option value="egreso">Egreso (salida)</option><option value="ingreso">Ingreso (entrada)</option></select>
     <label htmlFor="mv-cat">Categoría</label><select id="mv-cat" required value={form.categoria_id} onChange={set('categoria_id')}><option value="">Elige una categoría</option>{options.map(item=><option key={item.id} value={item.id}>{item.nombre} · {item.naturaleza}</option>)}</select>
     <label htmlFor="mv-fecha">Fecha</label><input id="mv-fecha" type="date" required value={form.fecha} onChange={set('fecha')}/>
@@ -102,65 +105,70 @@ function MovementForm({categorias,plazas,initial,onClose,onSaved}){
     <label htmlFor="mv-con">Concepto</label><input id="mv-con" maxLength={200} value={form.concepto} onChange={set('concepto')} placeholder="Ej. compra de guantes, renta de bodega…"/>
     <label htmlFor="mv-plaza">Plaza</label><select id="mv-plaza" value={form.plaza} onChange={set('plaza')}>{plazas.map(name=><option key={name}>{name}</option>)}</select>
     <label htmlFor="mv-metodo">Método de pago <span>(opcional)</span></label><select id="mv-metodo" value={form.metodo_pago} onChange={set('metodo_pago')}><option value="">—</option>{METODOS.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select>
-    <label htmlFor="mv-file">Foto o PDF del comprobante <span>(opcional)</span></label><input id="mv-file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={e=>setFile(e.target.files?.[0]||null)}/>
-    {initial?.comprobante_path&&!file&&<small className="field-hint">Ya tiene un comprobante; si subes otro lo reemplaza.</small>}
+    {!requestOnly&&<><label htmlFor="mv-file">Foto o PDF del comprobante <span>(opcional)</span></label><input id="mv-file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={e=>setFile(e.target.files?.[0]||null)}/>
+    {initial?.comprobante_path&&!file&&<small className="field-hint">Ya tiene un comprobante; si subes otro lo reemplaza.</small>}</>}
+    {requestOnly&&<><label htmlFor="mv-reason">Motivo de la corrección</label><textarea id="mv-reason" required maxLength={500} value={reason} onChange={e=>setReason(e.target.value)}/><p className="mut">El movimiento se excluirá temporalmente de los reportes hasta que Gerente o Root resuelva la solicitud.</p></>}
     {error&&<p className="data-alert" role="alert">{error}</p>}
-    <div className="row"><button className="btn" type="submit" disabled={busy}>{busy?'Guardando…':'Guardar'}</button><button className="btn ghost" type="button" disabled={busy} onClick={onClose}>Cancelar</button></div>
+    <div className="row"><button className="btn" type="submit" disabled={busy}>{busy?'Enviando…':requestOnly?'Enviar solicitud':'Guardar'}</button><button className="btn ghost" type="button" disabled={busy} onClick={onClose}>Cancelar</button></div>
   </form></div>;
 }
 
-function Libro({readOnly,canDelete}){
+function Libro({readOnly,canDelete,canRequestChanges=false}){
   const[month,setMonth]=useState(monthKey());
   const[categorias]=useQuery(()=>sb.from('finanzas_categorias').select('*').order('nombre'),[]);
   const[plazaRows]=useQuery(()=>sb.from('plazas').select('nombre').eq('activa',true).order('nombre'),[]);
-  const[rows,load,state]=useQuery(()=>{const[from,to]=monthRange(month);return sb.from('movimientos_financieros').select('*, finanzas_categorias(nombre,naturaleza)').gte('fecha',from).lt('fecha',to).order('fecha',{ascending:false}).order('created_at',{ascending:false})},[month]);
+  const[rows,load,state]=useQuery(()=>{const[from,to]=monthRange(month);return sb.from('movimientos_financieros_vigentes').select('*, finanzas_categorias(nombre,naturaleza)').gte('fecha',from).lt('fecha',to).order('fecha',{ascending:false}).order('created_at',{ascending:false})},[month]);
   const[form,setForm]=useState(null);const[error,setError]=useState('');const[busy,setBusy]=useState(false);
   const plazas=plazaRows.length?plazaRows.map(item=>item.nombre):['Morelos'];
   const income=sum(rows.filter(row=>row.tipo==='ingreso'),row=>row.monto);const expenses=sum(rows.filter(row=>row.tipo==='egreso'),row=>row.monto);
   const openReceipt=async path=>{setError('');const{data,error:urlError}=await sb.storage.from('comprobantes').createSignedUrl(path,120);if(urlError||!data?.signedUrl){setError(urlError?.message||'No se pudo abrir el comprobante.');return}window.open(data.signedUrl,'_blank','noopener')};
-  const remove=async row=>{if(!confirm('¿Eliminar este movimiento?'))return;setError('');setBusy(true);try{const{error:deleteError}=await sb.from('movimientos_financieros').delete().eq('id',row.id);if(deleteError)throw deleteError;if(row.comprobante_path){const{error:receiptError}=await sb.storage.from('comprobantes').remove([row.comprobante_path]);if(receiptError){setError(`El movimiento se eliminó, pero no se pudo borrar su comprobante: ${receiptError.message}`);await load();return}}await load()}catch(err){setError(err.message||'No se pudo eliminar.')}finally{setBusy(false)}};
+  const remove=async row=>{const reason=canRequestChanges?prompt('Motivo de la solicitud de eliminación:'):null;if(canRequestChanges&&reason===null)return;if(!canRequestChanges&&!confirm('¿Eliminar este movimiento?'))return;if(canRequestChanges&&!reason.trim()){setError('Escribe el motivo de la solicitud.');return}setError('');setBusy(true);try{const{error:deleteError}=canRequestChanges?await sb.rpc('submit_finance_change_request',{p_source_table:'movimientos_financieros',p_source_id:row.id,p_action:'delete',p_reason:reason.trim(),p_proposed_data:null}):await sb.from('movimientos_financieros').delete().eq('id',row.id);if(deleteError)throw deleteError;if(!canRequestChanges&&row.comprobante_path){const{error:receiptError}=await sb.storage.from('comprobantes').remove([row.comprobante_path]);if(receiptError){setError(`El movimiento se eliminó, pero no se pudo borrar su comprobante: ${receiptError.message}`);await load();return}}await load()}catch(err){setError(err.message||'No se pudo eliminar.')}finally{setBusy(false)}};
   const exportCsv=async()=>{setError('');setBusy(true);try{await exportMonthCsv(month)}catch(err){setError(err.message)}finally{setBusy(false)}};
   return <div className="card tbl">
     <div className="row"><div style={{flex:1}}><span className="lbl">Libro</span><h3>Ingresos y egresos</h3></div><input type="month" aria-label="Mes" value={month} onChange={e=>e.target.value&&setMonth(e.target.value)}/><button type="button" className="btn ghost" disabled={busy} onClick={exportCsv}>Descargar para el contador (CSV)</button>{!readOnly&&<button type="button" className="btn" onClick={()=>setForm({})}>+ Movimiento</button>}</div>
+    <p className="mut">Los movimientos con una solicitud de corrección pendiente se excluyen temporalmente de este libro, los saldos y las exportaciones.</p>
     <div className="grid kpi-grid"><Kpi label="Ingresos" value={money(income)} tone="ok"/><Kpi label="Egresos" value={money(expenses)} tone="bad"/><Kpi label="Balance" value={money(income-expenses)} tone={income-expenses<0?'bad':'ok'}/></div>
     {error&&<p className="data-alert" role="alert">{error}</p>}<Feedback state={state} empty={!rows.length&&'No hay movimientos en este mes.'}/>
-    {rows.length>0&&<table><thead><tr><th>Fecha</th><th>Categoría</th><th>Concepto</th><th>Monto</th><th>Origen</th><th>Comprobante</th>{(!readOnly||canDelete)&&<th>Acciones</th>}</tr></thead><tbody>{rows.map(row=><tr key={row.id}>
+    {rows.length>0&&<table><thead><tr><th>Fecha</th><th>Categoría</th><th>Concepto</th><th>Monto</th><th>Origen</th><th>Comprobante</th>{(!readOnly||canDelete||canRequestChanges)&&<th>Acciones</th>}</tr></thead><tbody>{rows.map(row=><tr key={row.id}>
       <td>{showDate(row.fecha)}</td><td>{row.finanzas_categorias?.nombre||'—'}<div className="mut">{row.finanzas_categorias?.naturaleza||''}</div></td><td>{row.concepto||'—'}</td>
       <td className={row.tipo==='ingreso'?'amount-in':'amount-out'}>{row.tipo==='ingreso'?'+':'−'}{money(row.monto)}</td><td>{ORIGEN_LABEL[row.origen]||row.origen}</td>
       <td>{row.comprobante_path?<button type="button" className="btn ghost" onClick={()=>openReceipt(row.comprobante_path)}>Ver</button>:<span className="mut">—</span>}</td>
-      {(!readOnly||canDelete)&&<td>{!readOnly&&(row.origen==='manual'||canDelete)&&<button type="button" className="btn ghost" disabled={busy} onClick={()=>setForm(row)}>Editar</button>} {canDelete&&<button type="button" className="btn red" disabled={busy} onClick={()=>remove(row)}>Eliminar</button>}</td>}</tr>)}</tbody></table>}
-    {form&&<MovementForm categorias={categorias} plazas={plazas} initial={form.id?form:null} onClose={()=>setForm(null)} onSaved={async()=>{setForm(null);await load()}}/>}
+      {(!readOnly||canDelete||canRequestChanges)&&<td>{row.origen==='manual'&&(!readOnly||canRequestChanges)&&<button type="button" className="btn ghost" disabled={busy} onClick={()=>setForm(row)}>{canRequestChanges?'Solicitar corrección':'Editar'}</button>} {(canDelete||canRequestChanges)&&row.origen==='manual'&&<button type="button" className="btn red" disabled={busy} onClick={()=>remove(row)}>{canRequestChanges?'Solicitar eliminación':'Eliminar'}</button>}</td>}</tr>)}</tbody></table>}
+    {form&&<MovementForm categorias={categorias} plazas={plazas} initial={form.id?form:null} requestOnly={canRequestChanges&&Boolean(form.id)} onClose={()=>setForm(null)} onSaved={async()=>{setForm(null);await load()}}/>}
   </div>;
 }
 
 /* ---------- Caja chica y viáticos ---------- */
-function CajaChica({readOnly,canDelete}){
+function CajaChica({readOnly,canDelete,canRequestChanges=false}){
   const[saldos,loadSaldos]=useQuery(()=>sb.from('caja_chica_saldo').select('*'),[]);
-  const[rows,load,state]=useQuery(()=>sb.from('caja_chica_movimientos').select('*').order('fecha',{ascending:false}).order('created_at',{ascending:false}).limit(200),[]);
+  const[rows,load,state]=useQuery(()=>sb.from('caja_chica_movimientos_vigentes').select('*').order('fecha',{ascending:false}).order('created_at',{ascending:false}).limit(200),[]);
   const[categorias]=useQuery(()=>sb.from('finanzas_categorias').select('id,nombre,tipo,activa').eq('tipo','egreso').eq('activa',true).order('nombre'),[]);
   const[obras]=useQuery(()=>sb.from('obras').select('id,folio,cliente').order('programacion',{ascending:false}).limit(100),[]);
   const[plazaRows]=useQuery(()=>sb.from('plazas').select('nombre').eq('activa',true).order('nombre'),[]);
   const plazas=plazaRows.length?plazaRows.map(item=>item.nombre):['Morelos'];
   const blank=()=>({tipo:'viatico',fecha:todayInput(),monto:'',tecnico:'',obra_id:'',categoria_id:'',concepto:'',plaza:plazas[0]});
-  const[form,setForm]=useState(null);const[busy,setBusy]=useState(false);const[error,setError]=useState('');
+  const[form,setForm]=useState(null);const[reason,setReason]=useState('');const[busy,setBusy]=useState(false);const[error,setError]=useState('');
   const set=key=>event=>setForm(current=>({...current,[key]:event.target.value}));
   const reload=async()=>{await Promise.all([load(),loadSaldos()])};
   const save=async event=>{event.preventDefault();setError('');setBusy(true);try{
     const row={tipo:form.tipo,fecha:form.fecha,monto:Number(form.monto),tecnico:form.tecnico.trim()||null,obra_id:form.obra_id||null,categoria_id:form.tipo==='gasto'&&form.categoria_id?form.categoria_id:null,concepto:form.concepto.trim()||null,plaza:form.plaza||plazas[0]};
-    const{error:insertError}=await sb.from('caja_chica_movimientos').insert(row);if(insertError)throw insertError;setForm(null);await reload()}catch(err){setError(err.message||'No se pudo registrar el movimiento.')}finally{setBusy(false)}};
-  const remove=async row=>{if(!confirm('¿Eliminar este movimiento? También se quita del libro.'))return;setError('');setBusy(true);try{const{error:deleteError}=await sb.from('caja_chica_movimientos').delete().eq('id',row.id);if(deleteError)throw deleteError;await reload()}catch(err){setError(err.message||'No se pudo eliminar.')}finally{setBusy(false)}};
+    const{error:saveError}=form.id&&canRequestChanges
+      ?await sb.rpc('submit_finance_change_request',{p_source_table:'caja_chica_movimientos',p_source_id:form.id,p_action:'update',p_reason:reason.trim(),p_proposed_data:row})
+      :await sb.from('caja_chica_movimientos').insert(row);
+    if(saveError)throw saveError;setForm(null);setReason('');await reload()}catch(err){setError(err.message||'No se pudo registrar el movimiento.')}finally{setBusy(false)}};
+  const remove=async row=>{const reasonText=canRequestChanges?prompt('Motivo de la solicitud de eliminación:'):null;if(canRequestChanges&&reasonText===null)return;if(!canRequestChanges&&!confirm('¿Eliminar este movimiento? También se quita del libro.'))return;if(canRequestChanges&&!reasonText.trim()){setError('Escribe el motivo de la solicitud.');return}setError('');setBusy(true);try{const{error:deleteError}=canRequestChanges?await sb.rpc('submit_finance_change_request',{p_source_table:'caja_chica_movimientos',p_source_id:row.id,p_action:'delete',p_reason:reasonText.trim(),p_proposed_data:null}):await sb.from('caja_chica_movimientos').delete().eq('id',row.id);if(deleteError)throw deleteError;await reload()}catch(err){setError(err.message||'No se pudo eliminar.')}finally{setBusy(false)}};
   const perTech=Object.entries(rows.filter(row=>row.tipo==='viatico').reduce((acc,row)=>{const key=row.tecnico||'Sin nombre';acc[key]=(acc[key]||0)+Number(row.monto);return acc},{})).sort((a,b)=>b[1]-a[1]);
   const label=type=>CAJA_TIPOS.find(([value])=>value===type)?.[1]||type;
   return <div className="finance-stack">
     <div className="card"><div className="row"><div style={{flex:1}}><span className="lbl">Caja chica</span><h3>Saldo disponible</h3></div>{!readOnly&&<button type="button" className="btn" onClick={()=>setForm(blank())}>+ Movimiento de caja</button>}</div>
       <div className="grid kpi-grid">{saldos.length?saldos.map(item=><Kpi key={item.plaza} label={`Saldo · ${item.plaza}`} value={money(item.saldo)} tone={Number(item.saldo)<0?'bad':'ok'}/>):<Kpi label="Saldo" value={money(0)}/>}
         <Kpi label="Viáticos entregados" value={money(sum(saldos,item=>item.viaticos))}/><Kpi label="Gastos de caja" value={money(sum(saldos,item=>item.gastos))}/></div>
-      <p className="mut">La reposición y la devolución mueven dinero a la caja. Los viáticos y gastos salen de la caja y se registran solos como egreso en el libro.</p></div>
+      <p className="mut">La reposición y la devolución mueven dinero a la caja. Los viáticos y gastos salen de la caja y se registran solos como egreso en el libro. Los movimientos con corrección pendiente se excluyen temporalmente del saldo y los reportes.</p></div>
     {perTech.length>0&&<div className="card tbl"><h3>Viáticos por técnico</h3><table><thead><tr><th>Técnico</th><th>Total entregado</th></tr></thead><tbody>{perTech.map(([name,total])=><tr key={name}><td>{name}</td><td>{money(total)}</td></tr>)}</tbody></table></div>}
     <div className="card tbl"><h3>Movimientos recientes</h3>{error&&<p className="data-alert" role="alert">{error}</p>}<Feedback state={state} empty={!rows.length&&'Aún no hay movimientos de caja.'}/>
-      {rows.length>0&&<table><thead><tr><th>Fecha</th><th>Tipo</th><th>Técnico</th><th>Concepto</th><th>Monto</th>{canDelete&&<th>Acciones</th>}</tr></thead><tbody>{rows.map(row=><tr key={row.id}><td>{showDate(row.fecha)}</td><td>{label(row.tipo)}</td><td>{row.tecnico||'—'}</td><td>{row.concepto||'—'}</td><td className={['reposicion','devolucion'].includes(row.tipo)?'amount-in':'amount-out'}>{['reposicion','devolucion'].includes(row.tipo)?'+':'−'}{money(row.monto)}</td>{canDelete&&<td><button type="button" className="btn red" disabled={busy} onClick={()=>remove(row)}>Eliminar</button></td>}</tr>)}</tbody></table>}</div>
+      {rows.length>0&&<table><thead><tr><th>Fecha</th><th>Tipo</th><th>Técnico</th><th>Concepto</th><th>Monto</th>{(canDelete||canRequestChanges)&&<th>Acciones</th>}</tr></thead><tbody>{rows.map(row=><tr key={row.id}><td>{showDate(row.fecha)}</td><td>{label(row.tipo)}</td><td>{row.tecnico||'—'}</td><td>{row.concepto||'—'}</td><td className={['reposicion','devolucion'].includes(row.tipo)?'amount-in':'amount-out'}>{['reposicion','devolucion'].includes(row.tipo)?'+':'−'}{money(row.monto)}</td>{(canDelete||canRequestChanges)&&<td>{canRequestChanges&&<button type="button" className="btn ghost" disabled={busy} onClick={()=>{setReason('');setForm(row)}}>Solicitar edición</button>}<button type="button" className="btn red" disabled={busy} onClick={()=>remove(row)}>{canRequestChanges?'Solicitar eliminación':'Eliminar'}</button></td>}</tr>)}</tbody></table>}</div>
     {form&&<div className="modal"><form className="card appointment-form" onSubmit={save}>
-      <div className="row"><h3 style={{flex:1}}>Movimiento de caja chica</h3><button type="button" className="btn ghost" disabled={busy} onClick={()=>setForm(null)}>✕</button></div>
+      <div className="row"><h3 style={{flex:1}}>{form.id?'Solicitar corrección de caja chica':'Movimiento de caja chica'}</h3><button type="button" className="btn ghost" disabled={busy} onClick={()=>setForm(null)}>✕</button></div>
       <label htmlFor="cc-tipo">Tipo</label><select id="cc-tipo" value={form.tipo} onChange={set('tipo')}>{CAJA_TIPOS.map(([value,text])=><option key={value} value={value}>{text}</option>)}</select>
       <label htmlFor="cc-fecha">Fecha</label><input id="cc-fecha" type="date" required value={form.fecha} onChange={set('fecha')}/>
       <label htmlFor="cc-monto">Monto</label><input id="cc-monto" type="number" min="0.01" step="0.01" required value={form.monto} onChange={set('monto')}/>
@@ -169,8 +177,9 @@ function CajaChica({readOnly,canDelete}){
       {form.tipo==='gasto'&&<><label htmlFor="cc-cat">Categoría del gasto</label><select id="cc-cat" value={form.categoria_id} onChange={set('categoria_id')}><option value="">Otros egresos</option>{categorias.map(item=><option key={item.id} value={item.id}>{item.nombre}</option>)}</select></>}
       <label htmlFor="cc-con">Concepto <span>(opcional)</span></label><input id="cc-con" maxLength={200} value={form.concepto} onChange={set('concepto')} placeholder="Ej. gasolina para la obra de Jiutepec"/>
       {plazas.length>1&&<><label htmlFor="cc-plaza">Plaza</label><select id="cc-plaza" value={form.plaza} onChange={set('plaza')}>{plazas.map(name=><option key={name}>{name}</option>)}</select></>}
+      {form.id&&<><label htmlFor="cc-reason">Motivo de la corrección</label><textarea id="cc-reason" required maxLength={500} value={reason} onChange={e=>setReason(e.target.value)}/><p className="mut">El movimiento se excluirá temporalmente de los reportes hasta que Gerente o Root resuelva la solicitud.</p></>}
       {error&&<p className="data-alert" role="alert">{error}</p>}
-      <div className="row"><button className="btn" type="submit" disabled={busy}>{busy?'Guardando…':'Registrar'}</button><button className="btn ghost" type="button" disabled={busy} onClick={()=>setForm(null)}>Cancelar</button></div>
+      <div className="row"><button className="btn" type="submit" disabled={busy}>{busy?'Guardando…':form.id?'Enviar solicitud':'Registrar'}</button><button className="btn ghost" type="button" disabled={busy} onClick={()=>setForm(null)}>Cancelar</button></div>
     </form></div>}
   </div>;
 }
@@ -188,12 +197,82 @@ function Categorias({readOnly}){
   </div>;
 }
 
-export function Finanzas({readOnly=false,canDelete=false,canDeletePettyCash=canDelete}){
+const CHANGE_FIELD_LABELS={fecha:'Fecha',tipo:'Tipo',categoria_id:'Categoría',monto:'Monto',concepto:'Concepto',plaza:'Plaza',metodo_pago:'Método de pago',tecnico:'Técnico',obra_id:'Obra'};
+const CHANGE_STATUS_LABELS={pending:'Pendiente',approved:'Aprobada',rejected:'Rechazada'};
+const CHANGE_ACTION_LABELS={update:'Corrección',delete:'Eliminación'};
+function ChangeData({data}){
+  if(!data)return <span className="mut">—</span>;
+  return <dl className="finance-change-data">{Object.entries(data).map(([key,value])=><div key={key}><dt>{CHANGE_FIELD_LABELS[key]||key}</dt><dd>{key==='monto'?money(value):value||'—'}</dd></div>)}</dl>;
+}
+
+function FinanceChangeReviewForm({request,onClose,onApprove}){
+  const[categories]=useQuery(()=>sb.from('finanzas_categorias').select('id,nombre,tipo').order('nombre'),[]);
+  const[plazaRows]=useQuery(()=>sb.from('plazas').select('nombre').eq('activa',true).order('nombre'),[]);
+  const[obras]=useQuery(()=>sb.from('obras').select('id,folio,cliente').order('programacion',{ascending:false}).limit(100),[]);
+  const[data,setData]=useState(()=>({...request.proposed_data}));
+  const[busy,setBusy]=useState(false);const[error,setError]=useState('');
+  const plazas=plazaRows.length?plazaRows.map(row=>row.nombre):['Morelos'];
+  const set=key=>event=>setData(current=>({...current,[key]:event.target.value}));
+  const setMovementType=event=>setData(current=>({...current,tipo:event.target.value,categoria_id:''}));
+  const save=async event=>{event.preventDefault();setError('');setBusy(true);try{await onApprove(data)}catch(err){setError(err.message||'No se pudo aprobar la corrección.')}finally{setBusy(false)}};
+  return <div className="modal"><form className="card appointment-form" onSubmit={save}>
+    <div className="row"><h3 style={{flex:1}}>Revisar y ajustar corrección</h3><button type="button" className="btn ghost" disabled={busy} onClick={onClose}>✕</button></div>
+    <p className="mut">Al aprobar, se aplicarán estos datos finales al movimiento.</p>
+    {request.source_table==='movimientos_financieros'?<>
+      <label htmlFor="review-mv-type">Tipo</label><select id="review-mv-type" value={data.tipo||''} onChange={setMovementType}><option value="egreso">Egreso</option><option value="ingreso">Ingreso</option></select>
+      <label htmlFor="review-mv-category">Categoría</label><select id="review-mv-category" required value={data.categoria_id||''} onChange={set('categoria_id')}><option value="">Elige una categoría</option>{categories.filter(item=>item.tipo===data.tipo).map(item=><option key={item.id} value={item.id}>{item.nombre}</option>)}</select>
+      <label htmlFor="review-mv-date">Fecha</label><input id="review-mv-date" type="date" required value={data.fecha||''} onChange={set('fecha')}/>
+      <label htmlFor="review-mv-amount">Monto</label><input id="review-mv-amount" type="number" min="0.01" step="0.01" required value={data.monto??''} onChange={set('monto')}/>
+      <label htmlFor="review-mv-concept">Concepto</label><input id="review-mv-concept" maxLength={200} value={data.concepto||''} onChange={set('concepto')}/>
+      <label htmlFor="review-mv-plaza">Plaza</label><select id="review-mv-plaza" value={data.plaza||plazas[0]} onChange={set('plaza')}>{plazas.map(name=><option key={name}>{name}</option>)}</select>
+      <label htmlFor="review-mv-method">Método de pago</label><select id="review-mv-method" value={data.metodo_pago||''} onChange={set('metodo_pago')}><option value="">—</option>{METODOS.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select>
+    </>:<>
+      <label htmlFor="review-cc-type">Tipo</label><select id="review-cc-type" value={data.tipo||''} onChange={event=>setData(current=>({...current,tipo:event.target.value,categoria_id:event.target.value==='gasto'?current.categoria_id:''}))}>{CAJA_TIPOS.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select>
+      <label htmlFor="review-cc-date">Fecha</label><input id="review-cc-date" type="date" required value={data.fecha||''} onChange={set('fecha')}/>
+      <label htmlFor="review-cc-amount">Monto</label><input id="review-cc-amount" type="number" min="0.01" step="0.01" required value={data.monto??''} onChange={set('monto')}/>
+      {['viatico','devolucion'].includes(data.tipo)&&<><label htmlFor="review-cc-tech">Técnico</label><input id="review-cc-tech" maxLength={80} required={data.tipo==='viatico'} value={data.tecnico||''} onChange={set('tecnico')}/></>}
+      {['viatico','gasto'].includes(data.tipo)&&<><label htmlFor="review-cc-work">Obra</label><select id="review-cc-work" value={data.obra_id||''} onChange={set('obra_id')}><option value="">—</option>{obras.map(item=><option key={item.id} value={item.id}>{item.folio||'Sin folio'} · {item.cliente||''}</option>)}</select></>}
+      {data.tipo==='gasto'&&<><label htmlFor="review-cc-category">Categoría del gasto</label><select id="review-cc-category" value={data.categoria_id||''} onChange={set('categoria_id')}><option value="">Otros egresos</option>{categories.filter(item=>item.tipo==='egreso').map(item=><option key={item.id} value={item.id}>{item.nombre}</option>)}</select></>}
+      <label htmlFor="review-cc-concept">Concepto</label><input id="review-cc-concept" maxLength={200} value={data.concepto||''} onChange={set('concepto')}/>
+      <label htmlFor="review-cc-plaza">Plaza</label><select id="review-cc-plaza" value={data.plaza||plazas[0]} onChange={set('plaza')}>{plazas.map(name=><option key={name}>{name}</option>)}</select>
+    </>}
+    {error&&<p className="data-alert" role="alert">{error}</p>}
+    <div className="row"><button className="btn" type="submit" disabled={busy}>{busy?'Aplicando…':'Aprobar corrección'}</button><button className="btn ghost" type="button" disabled={busy} onClick={onClose}>Cancelar</button></div>
+  </form></div>;
+}
+
+export function FinanceChangeRequests({role}){
+  const[filter,setFilter]=useState(role==='administrative'?'': 'pending');
+  const[requests,load,state]=useQuery(()=>sb.rpc('list_finance_change_requests',{p_status:filter||null}),[filter]);
+  const[selected,setSelected]=useState([]);const[editing,setEditing]=useState(null);
+  const[busy,setBusy]=useState(false);const[error,setError]=useState('');
+  const canReview=role==='manager'||role==='root';
+  const resolve=async(ids,decision,overrides={})=>{setError('');setBusy(true);try{const{error:rpcError}=await sb.rpc('resolve_finance_change_requests',{p_request_ids:ids,p_decision:decision,p_overrides:overrides});if(rpcError)throw rpcError;setSelected(current=>current.filter(id=>!ids.includes(id)));await load();return true}catch(err){setError(err.message||'No se pudieron resolver las solicitudes.');return false}finally{setBusy(false)}};
+  const confirmBulk=async decision=>{const title=decision==='approve'?'aprobar':'rechazar';if(!selected.length||!confirm(`¿${title} las ${selected.length} solicitudes seleccionadas? La operación será completa o no se aplicará.`))return;await resolve(selected,decision)};
+  const resolveOne=(id,decision)=>resolve([id],decision);
+  const approveEdit=async data=>{if(await resolve([editing.id],'approve',{[editing.id]:data}))setEditing(null);else throw new Error('Revisa el mensaje de error y vuelve a intentarlo.')};
+  const toggle=id=>setSelected(current=>current.includes(id)?current.filter(item=>item!==id):[...current,id]);
+  const sourceLabel=request=>request.source_table==='caja_chica_movimientos'?'Caja chica':'Libro financiero';
+  return <div className="card tbl finance-change-requests">
+    <div className="row"><div style={{flex:1}}><span className="lbl">{canReview?'Revisión financiera':'Seguimiento'}</span><h3>{canReview?'Solicitudes de corrección':'Mis solicitudes de corrección'}</h3></div><button type="button" className="btn ghost" disabled={busy||state.loading} onClick={load}>Actualizar</button><select aria-label="Filtrar solicitudes" value={filter} onChange={event=>{setSelected([]);setFilter(event.target.value)}}><option value="">Todas</option><option value="pending">Pendientes</option><option value="approved">Aprobadas</option><option value="rejected">Rechazadas</option></select></div>
+    {canReview&&filter==='pending'&&<div className="row"><button type="button" className="btn" disabled={busy||!selected.length} onClick={()=>confirmBulk('approve')}>Aprobar seleccionadas ({selected.length})</button><button type="button" className="btn ghost" disabled={busy||!selected.length} onClick={()=>confirmBulk('reject')}>Rechazar seleccionadas</button><span className="mut">La selección se procesa en una sola transacción.</span></div>}
+    <Feedback state={state} empty={!requests.length&&'No hay solicitudes para mostrar.'}/>{error&&<p className="data-alert" role="alert">{error}</p>}
+    {!!requests.length&&<div className="finance-change-list">{requests.map(request=><article className="finance-change-item" key={request.id}>
+      <div className="finance-change-heading">{canReview&&request.status==='pending'&&<input type="checkbox" aria-label={`Seleccionar solicitud de ${request.requester_name}`} checked={selected.includes(request.id)} onChange={()=>toggle(request.id)}/>}<div><strong>{sourceLabel(request)} · {CHANGE_ACTION_LABELS[request.action]}</strong><div className="mut">{request.requester_name} · {new Date(request.created_at).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'})}</div></div><span className={`pill ${request.status==='approved'?'confirmado':request.status==='rejected'?'no':''}`}>{CHANGE_STATUS_LABELS[request.status]||request.status}</span></div>
+      <p><strong>Motivo:</strong> {request.reason}</p><div className="finance-change-data-columns"><div><strong>Original</strong><ChangeData data={request.before_data}/></div>{request.proposed_data&&<div><strong>Propuesta</strong><ChangeData data={request.proposed_data}/></div>}</div>
+      {request.reviewed_at&&<p className="mut">Resuelta por {request.reviewer_name} · {new Date(request.reviewed_at).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'})}</p>}
+      {canReview&&request.status==='pending'&&<div className="row"><button type="button" className="btn" disabled={busy} onClick={()=>request.action==='update'?setEditing(request):resolveOne(request.id,'approve')}>{request.action==='update'?'Editar y aprobar':'Aprobar eliminación'}</button><button type="button" className="btn ghost" disabled={busy} onClick={()=>resolveOne(request.id,'reject')}>Rechazar</button></div>}
+    </article>)}</div>}
+    {editing&&<FinanceChangeReviewForm request={editing} onClose={()=>setEditing(null)} onApprove={approveEdit}/>}
+  </div>;
+}
+
+export function Finanzas({readOnly=false,canDelete=false,canDeletePettyCash=canDelete,canRequestChanges=false}){
   const[sub,setSub]=useState('libro');
   const tabs=[['libro','Libro'],['caja','Caja chica'],['categorias','Categorías']];
   return <div className="finance-page"><div className="subtabs" role="tablist" aria-label="Finanzas">{tabs.map(([key,label])=><button key={key} type="button" role="tab" aria-selected={sub===key} className={sub===key?'on':''} onClick={()=>setSub(key)}>{label}</button>)}</div>
     {readOnly&&<p className="mut">Vista de solo lectura.</p>}
-    {sub==='libro'&&<Libro readOnly={readOnly} canDelete={canDelete}/>}{sub==='caja'&&<CajaChica readOnly={readOnly} canDelete={canDeletePettyCash}/>}{sub==='categorias'&&<Categorias readOnly={readOnly}/>}</div>;
+    {sub==='libro'&&<Libro readOnly={readOnly} canDelete={canDelete} canRequestChanges={canRequestChanges}/>}{sub==='caja'&&<CajaChica readOnly={readOnly} canDelete={canDeletePettyCash} canRequestChanges={canRequestChanges}/>}{sub==='categorias'&&<Categorias readOnly={readOnly}/>}</div>;
 }
 
 /* ---------- Stock por medición (barriles) y artículos por reponer ---------- */
@@ -254,6 +333,7 @@ export function Reportes(){
   const table=(title,rows)=><div className="card tbl"><h3>{title}</h3>{rows.length?<table><thead><tr><th>Categoría</th><th>Fijo / variable</th><th>Total</th></tr></thead><tbody>{rows.map(row=><tr key={row.categoria}><td>{row.categoria}</td><td>{row.naturaleza}</td><td>{money(row.total)}</td></tr>)}</tbody></table>:<p className="mut">Sin movimientos.</p>}</div>;
   return <div className="finance-stack">
     <div className="card"><div className="row"><div style={{flex:1}}><span className="lbl">Reportes</span><h2>Resumen del mes</h2></div><input type="month" aria-label="Mes" value={month} onChange={e=>e.target.value&&setMonth(e.target.value)}/><button type="button" className="btn" disabled={busy} onClick={exportCsv}>Descargar para el contador (CSV)</button></div>
+      <p className="mut">Los movimientos con solicitud de corrección pendiente se excluyen temporalmente de los totales y de la exportación.</p>
       {error&&<p className="data-alert" role="alert">{error}</p>}<Feedback state={state}/>
       <div className="grid kpi-grid"><Kpi label="Ingresos" value={money(income)} tone="ok"/><Kpi label="Egresos" value={money(expenses)} tone="bad"/><Kpi label="Balance" value={money(income-expenses)} tone={income-expenses<0?'bad':'ok'}/><Kpi label="Gastos fijos" value={money(fixed)}/><Kpi label="Gastos variables" value={money(expenses-fixed)}/></div></div>
     <div className="grid report-grid">{table('Ingresos por categoría',group('ingreso'))}{table('Egresos por categoría',group('egreso'))}</div>

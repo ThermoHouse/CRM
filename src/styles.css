@@ -134,6 +134,16 @@ main:has(.lead-table){width:100%;max-width:none}.lead-table{width:100%}.lead-tab
 
 /* Finanzas, cierres, stock y reportes */
 .finance-page,.finance-stack{display:grid;gap:14px}
+.finance-change-list{display:grid;gap:12px;margin-top:14px}
+.finance-change-item{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--card2)}
+.finance-change-heading{display:flex;align-items:center;gap:12px}
+.finance-change-heading>div{flex:1}
+.finance-change-data-columns{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:12px 0}
+.finance-change-data{display:grid;gap:4px;margin:8px 0}
+.finance-change-data>div{display:grid;grid-template-columns:minmax(90px,auto) 1fr;gap:10px}
+.finance-change-data dt{color:var(--mut)}
+.finance-change-data dd{margin:0;overflow-wrap:anywhere}
+.finance-change-data-columns>div>strong{display:block}
 .subtabs{display:flex;gap:6px;flex-wrap:wrap}
 .subtabs button{border:1px solid var(--line);background:var(--card);color:var(--mut);border-radius:999px;padding:7px 16px;font-weight:700;cursor:pointer}
 .subtabs button.on{background:var(--card2);color:inherit;border-color:var(--info)}
