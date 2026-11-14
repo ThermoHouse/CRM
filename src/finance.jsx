@@ -151,7 +151,7 @@ function CajaChica({readOnly,canDelete,canRequestChanges=false}){
   const set=key=>event=>setForm(current=>({...current,[key]:event.target.value}));
   const reload=async()=>{await Promise.all([load(),loadSaldos()])};
   const save=async event=>{event.preventDefault();setError('');setBusy(true);try{
-    const row={tipo:form.tipo,fecha:form.fecha,monto:Number(form.monto),tecnico:form.tecnico.trim()||null,obra_id:form.obra_id||null,categoria_id:form.tipo==='gasto'&&form.categoria_id?form.categoria_id:null,concepto:form.concepto.trim()||null,plaza:form.plaza||plazas[0]};
+    const row={tipo:form.tipo,fecha:form.fecha,monto:Number(form.monto),tecnico:(form.tecnico||'').trim()||null,obra_id:form.obra_id||null,categoria_id:form.tipo==='gasto'&&form.categoria_id?form.categoria_id:null,concepto:(form.concepto||'').trim()||null,plaza:form.plaza||plazas[0]};
     const{error:saveError}=form.id&&canRequestChanges
       ?await sb.rpc('submit_finance_change_request',{p_source_table:'caja_chica_movimientos',p_source_id:form.id,p_action:'update',p_reason:reason.trim(),p_proposed_data:row})
       :await sb.from('caja_chica_movimientos').insert(row);
