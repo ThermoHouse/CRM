@@ -147,7 +147,7 @@ export default function SalesToday({ leads, statusLabels = {}, onOpen }) {
               <div>💡 {a.suggestion}</div>
               <div className="hoy-actions">
                 {tel ? <a className="primary" href={`tel:+52${tel}`}>Llamar</a> : <span className="mut" style={{ alignSelf: 'center' }}>Sin teléfono</span>}
-                {tel && <a href={`https://wa.me/52${tel}`} target="_blank" rel="noreferrer" onClick={() => { if (!isDone) register(lead, 'whatsapp'); }}>WhatsApp</a>}
+                {tel && <a href={`https://web.whatsapp.com/send?phone=52${tel}`} target="_blank" rel="noopener noreferrer" onClick={() => { if (!isDone) register(lead, 'whatsapp'); }}>WhatsApp</a>}
                 <button type="button" disabled={busyId === lead.id || isDone} onClick={() => register(lead, 'llamada')}>
                   {isDone ? '✓ Registrado' : busyId === lead.id ? 'Guardando…' : 'Registrar intento'}
                 </button>
