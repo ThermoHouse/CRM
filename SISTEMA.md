@@ -41,6 +41,8 @@ La interfaz oculta los módulos no autorizados y pone en modo de solo lectura la
 
 ### Leads y cotizaciones
 
+En la vista **Semáforo** de Leads, el indicador **Cotizacion enviada** permite marcar si se compartió la cotización con el cliente. El valor se guarda en `leads.cotizacion_enviada`; para habilitarlo, ejecutar `supabase/46_lead_quote_sent.sql`.
+
 Es el módulo principal de trabajo comercial. Permite consultar, crear y actualizar clientes potenciales; registrar datos de contacto y ubicación; asignar plaza y asesor; clasificar al cliente como residencial o empresarial; y gestionar estado, fecha de contacto, próxima llamada y notas.
 
 La ficha/cotización contempla, entre otros datos:

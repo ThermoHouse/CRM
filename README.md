@@ -152,5 +152,6 @@ Ejecuta en orden, después de `23_security_hardening.sql` y revisando antes cuá
 40. `40_sales_all_leads_read.sql`: permite a Ventas consultar todos los leads sin ampliar permisos para editarlos/eliminarlos, registrar intentos de contacto ni consultar visitas/obras de leads ajenos.
 41. `41_sales_warranty_admin_finance_delete.sql`: permite a Ventas crear/editar sus propios reportes técnicos y adjuntos; permite a Administrativo eliminar movimientos del libro y sus comprobantes. Si se usa el flujo de solicitudes, la migración `45` reemplaza la eliminación directa de Administrativo.
 45. `45_finance_change_requests.sql`: ejecutar después de las migraciones `25`, `27`, `30` y `41`. Administrativo puede solicitar cambios o eliminación de movimientos del libro y caja chica; Gerente y Root pueden revisar, editar la propuesta antes de aprobar, aceptar o rechazar, también en bloque. Las solicitudes pendientes se excluyen temporalmente de los saldos, resúmenes y exportaciones; las aprobaciones conservan el movimiento como anulado y dejan historial de la decisión.
+46. `46_lead_quote_sent.sql`: agrega el indicador persistente **Cotizacion enviada** a la tabla de Leads.
 
 Para dar el rol de gerente, root lo asigna desde **Usuarios** (Gerente · consulta y reportes). No requiere cambios en las Edge Functions ni nuevos secretos.
