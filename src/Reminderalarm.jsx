@@ -91,7 +91,7 @@ const CSS = `
 .alarm-fab-btn.ringing{background:#dc2626;color:#fff;border-color:#dc2626;animation:alarm-pulse 1s infinite}
 .alarm-panel{width:min(300px,86vw);display:grid;gap:10px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--card);box-shadow:0 8px 28px rgba(0,0,0,.3)}
 .alarm-panel label{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px}
-.alarm-panel small{color:var(--mut);font-size:11px;line-height:1.4}
+.alarm-panel small{color:var(--mut);font-size:12px;line-height:1.4}
 .alarm-overlay{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:16px;background:rgba(0,0,0,.6)}
 .alarm-modal{width:min(460px,100%);max-height:88vh;overflow:auto;display:grid;gap:12px;padding:18px;border:2px solid #dc2626;border-radius:16px;background:var(--card);box-shadow:0 20px 60px rgba(0,0,0,.5)}
 .alarm-modal h3{margin:0;font-size:18px}
@@ -103,7 +103,7 @@ const CSS = `
 @keyframes alarm-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
 `;
 
-export default function ReminderAlarm({ userId, userEmail, onOpenLeads }) {
+export default function ReminderAlarm({ userId, userEmail, onOpenLeads, isRoot = false }) {
   const [leads, setLeads] = useState([]);
   const [loadError, setLoadError] = useState('');
   const [now, setNow] = useState(Date.now());
@@ -434,7 +434,7 @@ export default function ReminderAlarm({ userId, userEmail, onOpenLeads }) {
         {panel && (
           <div className="alarm-panel">
             {loadError && <p className="data-alert" role="alert">No se pudieron cargar las alarmas: {loadError}</p>}
-            {!loadError && !hasAppointmentColumn.current && <p className="migration-hint" role="status">Las alarmas de citas no están disponibles. Ejecuta <code>supabase/12_calendar_appointments.sql</code> en Supabase.</p>}
+            {!loadError && !hasAppointmentColumn.current && isRoot && <p className="migration-hint" role="status">Las alarmas de citas no están disponibles. Ejecuta <code>supabase/12_calendar_appointments.sql</code> en Supabase.</p>}
             <label>
               <span>Alarmas activadas</span>
               <input type="checkbox" checked={prefs.enabled} onChange={event => updatePrefs({ enabled: event.target.checked })} />

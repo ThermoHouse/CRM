@@ -235,3 +235,5 @@ input.sb-pending,select.sb-pending{border-color:color-mix(in srgb,var(--or) 70%,
 .sb-from{margin-left:6px;padding:1px 6px;border-radius:99px;background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok);font-size:var(--fs-xs);letter-spacing:.06em}
 .sb-ref{margin:0 0 12px;padding:10px 12px;border:1px dashed var(--line);border-radius:var(--r-md);font-size:12px;color:var(--mut);line-height:1.5}
 .sb-ref b{color:var(--tx)}
+
+.app-footer{padding:8px 16px;text-align:center;border-top:1px solid var(--line);font-size:12px}

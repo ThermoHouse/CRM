@@ -13,24 +13,28 @@ const hhmm = iso => new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit',
 const PAGE = 10;
 
 const CSS = `
-.hoy{display:grid;gap:14px;max-width:760px;margin:0 auto}
-.hoy-head h2{margin:0}
-.hoy-counters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-.hoy-counter{border:2px solid transparent;border-radius:12px;padding:14px 8px;text-align:center;cursor:pointer;background:rgba(127,127,127,.1);color:inherit;font:inherit;min-height:84px}
+.hoy{max-width:640px;margin:0 auto;display:grid;gap:16px;padding-bottom:24px}
+.hoy-header{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.hoy-counters{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.hoy-counter{border:2px solid transparent;border-radius:var(--r-md);padding:14px 8px;text-align:center;cursor:pointer;background:rgba(127,127,127,.08);color:inherit;font:inherit}
 .hoy-counter b{display:block;font-size:2rem;line-height:1.1}
-.hoy-counter span{font-size:.85rem;opacity:.85}
-.hoy-counter.on{border-color:currentColor}
+.hoy-counter span{font-size:12px;opacity:.85}
+.hoy-counter.active{border-color:var(--c);background:color-mix(in srgb,var(--c) 18%,transparent)}
 .hoy-list{display:grid;gap:10px}
-.hoy-item{border-left:5px solid var(--c);padding:10px 12px;border-radius:8px;background:rgba(127,127,127,.08);display:grid;gap:6px}
-.hoy-item.done{opacity:.55}
-.hoy-top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline}
-.hoy-why{display:flex;gap:6px;flex-wrap:wrap}
-.hoy-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:4px}
-.hoy-actions a,.hoy-actions button{min-height:48px;display:flex;align-items:center;justify-content:center;text-align:center;border-radius:10px;border:1px solid rgba(127,127,127,.4);background:transparent;color:inherit;font:inherit;font-weight:600;cursor:pointer;text-decoration:none;padding:6px}
-.hoy-actions .primary{background:var(--c);border-color:var(--c);color:#fff}
-.hoy-actions button:disabled{opacity:.6;cursor:default}
-.hoy-link{background:none;border:0;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;padding:0;justify-self:start}
-@media (min-width:700px){.hoy-actions{grid-template-columns:repeat(3,auto);justify-content:start}.hoy-actions a,.hoy-actions button{padding:6px 18px}}
+.hoy-item{border-left:5px solid var(--c);padding:10px 12px;border-radius:var(--r-sm);background:rgba(127,127,127,.08);display:grid;gap:4px}
+.hoy-name{font-size:1rem}
+.hoy-meta{font-size:13px;opacity:.85}
+.hoy-reason{font-size:13px}
+.hoy-miss{font-size:12px;opacity:.75}
+.hoy-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+.hoy-actions a,.hoy-actions button{min-height:48px;display:flex;align-items:center;justify-content:center;text-align:center;text-decoration:none;border-radius:var(--r-md);font-weight:800;font-size:14px;border:0;cursor:pointer;font-family:inherit}
+.hoy-call{background:#2563eb;color:#fff}
+.hoy-wa{background:#16a34a;color:#fff}
+.hoy-done{background:#0f766e;color:#fff;grid-column:1/-1}
+.hoy-undo{background:transparent;color:inherit;border:1px solid rgba(127,127,127,.45)!important;font-size:13px}
+.hoy-empty{text-align:center;padding:28px 12px;opacity:.85}
+.hoy-empty b{display:block;font-size:1.15rem;margin-bottom:6px}
+@media(max-width:420px){.hoy-counters{grid-template-columns:1fr 1fr 1fr}.hoy-counter b{font-size:1.6rem}}
 `;
 
 export default function SalesToday({ leads, statusLabels = {}, onOpen }) {

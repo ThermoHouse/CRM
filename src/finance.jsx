@@ -1,5 +1,6 @@
 import {useCallback,useEffect,useState} from 'react';
 import {sb} from './supabase';
+import {ConfirmDialog} from './ui';
 
 /* ---------- utilidades ---------- */
 const money=n=>'$'+Number(n||0).toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:2});
@@ -118,11 +119,12 @@ function Libro({readOnly,canDelete,canRequestChanges=false}){
   const[categorias]=useQuery(()=>sb.from('finanzas_categorias').select('*').order('nombre'),[]);
   const[plazaRows]=useQuery(()=>sb.from('plazas').select('nombre').eq('activa',true).order('nombre'),[]);
   const[rows,load,state]=useQuery(()=>{const[from,to]=monthRange(month);return sb.from('movimientos_financieros_vigentes').select('*, finanzas_categorias(nombre,naturaleza)').gte('fecha',from).lt('fecha',to).order('fecha',{ascending:false}).order('created_at',{ascending:false})},[month]);
-  const[form,setForm]=useState(null);const[error,setError]=useState('');const[busy,setBusy]=useState(false);
+  const[form,setForm]=useState(null);const[error,setError]=useState('');const[busy,setBusy]=useState(false);const[pendingDelete,setPendingDelete]=useState(null);
   const plazas=plazaRows.length?plazaRows.map(item=>item.nombre):['Morelos'];
   const income=sum(rows.filter(row=>row.tipo==='ingreso'),row=>row.monto);const expenses=sum(rows.filter(row=>row.tipo==='egreso'),row=>row.monto);
   const openReceipt=async path=>{setError('');const{data,error:urlError}=await sb.storage.from('comprobantes').createSignedUrl(path,120);if(urlError||!data?.signedUrl){setError(urlError?.message||'No se pudo abrir el comprobante.');return}window.open(data.signedUrl,'_blank','noopener')};
-  const remove=async row=>{const reason=canRequestChanges?prompt('Motivo de la solicitud de eliminación:'):null;if(canRequestChanges&&reason===null)return;if(!canRequestChanges&&!confirm('¿Eliminar este movimiento?'))return;if(canRequestChanges&&!reason.trim()){setError('Escribe el motivo de la solicitud.');return}setError('');setBusy(true);try{const{error:deleteError}=canRequestChanges?await sb.rpc('submit_finance_change_request',{p_source_table:'movimientos_financieros',p_source_id:row.id,p_action:'delete',p_reason:reason.trim(),p_proposed_data:null}):await sb.from('movimientos_financieros').delete().eq('id',row.id);if(deleteError)throw deleteError;if(!canRequestChanges&&row.comprobante_path){const{error:receiptError}=await sb.storage.from('comprobantes').remove([row.comprobante_path]);if(receiptError){setError(`El movimiento se eliminó, pero no se pudo borrar su comprobante: ${receiptError.message}`);await load();return}}await load()}catch(err){setError(err.message||'No se pudo eliminar.')}finally{setBusy(false)}};
+  const remove=row=>{if(canRequestChanges){const reason=prompt('Motivo de la solicitud de eliminación:');if(reason===null)return;if(!reason.trim()){setError('Escribe el motivo de la solicitud.');return}setError('');setBusy(true);sb.rpc('submit_finance_change_request',{p_source_table:'movimientos_financieros',p_source_id:row.id,p_action:'delete',p_reason:reason.trim(),p_proposed_data:null}).then(({error:deleteError})=>{if(deleteError)throw deleteError;return load()}).catch(err=>setError(err.message||'No se pudo eliminar.')).finally(()=>setBusy(false));return;}setError('');setPendingDelete(row)};
+  const confirmRemove=async()=>{const row=pendingDelete;if(!row)return;setError('');setBusy(true);try{const{error:deleteError}=await sb.from('movimientos_financieros').delete().eq('id',row.id);if(deleteError)throw deleteError;setPendingDelete(null);if(row.comprobante_path){const{error:receiptError}=await sb.storage.from('comprobantes').remove([row.comprobante_path]);if(receiptError){setError(`El movimiento se eliminó, pero no se pudo borrar su comprobante: ${receiptError.message}`);await load();return}}await load()}catch(err){setError(err.message||'No se pudo eliminar.')}finally{setBusy(false)}};
   const exportCsv=async()=>{setError('');setBusy(true);try{await exportMonthCsv(month)}catch(err){setError(err.message)}finally{setBusy(false)}};
   return <div className="card tbl">
     <div className="row"><div style={{flex:1}}><span className="lbl">Libro</span><h3>Ingresos y egresos</h3></div><input type="month" aria-label="Mes" value={month} onChange={e=>e.target.value&&setMonth(e.target.value)}/><button type="button" className="btn ghost" disabled={busy} onClick={exportCsv}>Descargar para el contador (CSV)</button>{!readOnly&&<button type="button" className="btn" onClick={()=>setForm({})}>+ Movimiento</button>}</div>
@@ -135,6 +137,7 @@ function Libro({readOnly,canDelete,canRequestChanges=false}){
       <td>{row.comprobante_path?<button type="button" className="btn ghost" onClick={()=>openReceipt(row.comprobante_path)}>Ver</button>:<span className="mut">—</span>}</td>
       {(!readOnly||canDelete||canRequestChanges)&&<td>{row.origen==='manual'&&(!readOnly||canRequestChanges)&&<button type="button" className="btn ghost" disabled={busy} onClick={()=>setForm(row)}>{canRequestChanges?'Solicitar corrección':'Editar'}</button>} {(canDelete||canRequestChanges)&&row.origen==='manual'&&<button type="button" className="btn red" disabled={busy} onClick={()=>remove(row)}>{canRequestChanges?'Solicitar eliminación':'Eliminar'}</button>}</td>}</tr>)}</tbody></table>}
     {form&&<MovementForm categorias={categorias} plazas={plazas} initial={form.id?form:null} requestOnly={canRequestChanges&&Boolean(form.id)} onClose={()=>setForm(null)} onSaved={async()=>{setForm(null);await load()}}/>}
+    <ConfirmDialog open={Boolean(pendingDelete)} title="Eliminar movimiento" message="¿Eliminar este movimiento?" confirmLabel="Eliminar" tone="danger" busy={busy} onConfirm={confirmRemove} onCancel={()=>{if(!busy)setPendingDelete(null)}}/>
   </div>;
 }
 
@@ -147,7 +150,7 @@ function CajaChica({readOnly,canDelete,canRequestChanges=false}){
   const[plazaRows]=useQuery(()=>sb.from('plazas').select('nombre').eq('activa',true).order('nombre'),[]);
   const plazas=plazaRows.length?plazaRows.map(item=>item.nombre):['Morelos'];
   const blank=()=>({tipo:'viatico',fecha:todayInput(),monto:'',tecnico:'',obra_id:'',categoria_id:'',concepto:'',plaza:plazas[0]});
-  const[form,setForm]=useState(null);const[reason,setReason]=useState('');const[busy,setBusy]=useState(false);const[error,setError]=useState('');
+  const[form,setForm]=useState(null);const[reason,setReason]=useState('');const[busy,setBusy]=useState(false);const[error,setError]=useState('');const[pendingDelete,setPendingDelete]=useState(null);
   const set=key=>event=>setForm(current=>({...current,[key]:event.target.value}));
   const reload=async()=>{await Promise.all([load(),loadSaldos()])};
   const save=async event=>{event.preventDefault();setError('');setBusy(true);try{
@@ -156,7 +159,8 @@ function CajaChica({readOnly,canDelete,canRequestChanges=false}){
       ?await sb.rpc('submit_finance_change_request',{p_source_table:'caja_chica_movimientos',p_source_id:form.id,p_action:'update',p_reason:reason.trim(),p_proposed_data:row})
       :await sb.from('caja_chica_movimientos').insert(row);
     if(saveError)throw saveError;setForm(null);setReason('');await reload()}catch(err){setError(err.message||'No se pudo registrar el movimiento.')}finally{setBusy(false)}};
-  const remove=async row=>{const reasonText=canRequestChanges?prompt('Motivo de la solicitud de eliminación:'):null;if(canRequestChanges&&reasonText===null)return;if(!canRequestChanges&&!confirm('¿Eliminar este movimiento? También se quita del libro.'))return;if(canRequestChanges&&!reasonText.trim()){setError('Escribe el motivo de la solicitud.');return}setError('');setBusy(true);try{const{error:deleteError}=canRequestChanges?await sb.rpc('submit_finance_change_request',{p_source_table:'caja_chica_movimientos',p_source_id:row.id,p_action:'delete',p_reason:reasonText.trim(),p_proposed_data:null}):await sb.from('caja_chica_movimientos').delete().eq('id',row.id);if(deleteError)throw deleteError;await reload()}catch(err){setError(err.message||'No se pudo eliminar.')}finally{setBusy(false)}};
+  const remove=row=>{if(canRequestChanges){const reasonText=prompt('Motivo de la solicitud de eliminación:');if(reasonText===null)return;if(!reasonText.trim()){setError('Escribe el motivo de la solicitud.');return}setError('');setBusy(true);sb.rpc('submit_finance_change_request',{p_source_table:'caja_chica_movimientos',p_source_id:row.id,p_action:'delete',p_reason:reasonText.trim(),p_proposed_data:null}).then(({error:deleteError})=>{if(deleteError)throw deleteError;return reload()}).catch(err=>setError(err.message||'No se pudo eliminar.')).finally(()=>setBusy(false));return;}setError('');setPendingDelete(row)};
+  const confirmRemove=async()=>{const row=pendingDelete;if(!row)return;setError('');setBusy(true);try{const{error:deleteError}=await sb.from('caja_chica_movimientos').delete().eq('id',row.id);if(deleteError)throw deleteError;setPendingDelete(null);await reload()}catch(err){setError(err.message||'No se pudo eliminar.')}finally{setBusy(false)}};
   const perTech=Object.entries(rows.filter(row=>row.tipo==='viatico').reduce((acc,row)=>{const key=row.tecnico||'Sin nombre';acc[key]=(acc[key]||0)+Number(row.monto);return acc},{})).sort((a,b)=>b[1]-a[1]);
   const label=type=>CAJA_TIPOS.find(([value])=>value===type)?.[1]||type;
   return <div className="finance-stack">
@@ -181,6 +185,7 @@ function CajaChica({readOnly,canDelete,canRequestChanges=false}){
       {error&&<p className="data-alert" role="alert">{error}</p>}
       <div className="row"><button className="btn" type="submit" disabled={busy}>{busy?'Guardando…':form.id?'Enviar solicitud':'Registrar'}</button><button className="btn ghost" type="button" disabled={busy} onClick={()=>setForm(null)}>Cancelar</button></div>
     </form></div>}
+    <ConfirmDialog open={Boolean(pendingDelete)} title="Eliminar movimiento de caja" message="¿Eliminar este movimiento? También se quita del libro." confirmLabel="Eliminar" tone="danger" busy={busy} onConfirm={confirmRemove} onCancel={()=>{if(!busy)setPendingDelete(null)}}/>
   </div>;
 }
 
@@ -245,10 +250,11 @@ export function FinanceChangeRequests({role}){
   const[filter,setFilter]=useState(role==='administrative'?'': 'pending');
   const[requests,load,state]=useQuery(()=>sb.rpc('list_finance_change_requests',{p_status:filter||null}),[filter]);
   const[selected,setSelected]=useState([]);const[editing,setEditing]=useState(null);
-  const[busy,setBusy]=useState(false);const[error,setError]=useState('');
+  const[busy,setBusy]=useState(false);const[error,setError]=useState('');const[bulkConfirm,setBulkConfirm]=useState(null);
   const canReview=role==='manager'||role==='root';
   const resolve=async(ids,decision,overrides={})=>{setError('');setBusy(true);try{const{error:rpcError}=await sb.rpc('resolve_finance_change_requests',{p_request_ids:ids,p_decision:decision,p_overrides:overrides});if(rpcError)throw rpcError;setSelected(current=>current.filter(id=>!ids.includes(id)));await load();return true}catch(err){setError(err.message||'No se pudieron resolver las solicitudes.');return false}finally{setBusy(false)}};
-  const confirmBulk=async decision=>{const title=decision==='approve'?'aprobar':'rechazar';if(!selected.length||!confirm(`¿${title} las ${selected.length} solicitudes seleccionadas? La operación será completa o no se aplicará.`))return;await resolve(selected,decision)};
+  const confirmBulk=decision=>{if(!selected.length)return;setBulkConfirm(decision)};
+  const doConfirmBulk=async()=>{if(!bulkConfirm||!selected.length)return;const decision=bulkConfirm;setBulkConfirm(null);await resolve(selected,decision)};
   const resolveOne=(id,decision)=>resolve([id],decision);
   const approveEdit=async data=>{if(await resolve([editing.id],'approve',{[editing.id]:data}))setEditing(null);else throw new Error('Revisa el mensaje de error y vuelve a intentarlo.')};
   const toggle=id=>setSelected(current=>current.includes(id)?current.filter(item=>item!==id):[...current,id]);
@@ -264,6 +270,7 @@ export function FinanceChangeRequests({role}){
       {canReview&&request.status==='pending'&&<div className="row"><button type="button" className="btn" disabled={busy} onClick={()=>request.action==='update'?setEditing(request):resolveOne(request.id,'approve')}>{request.action==='update'?'Editar y aprobar':'Aprobar eliminación'}</button><button type="button" className="btn ghost" disabled={busy} onClick={()=>resolveOne(request.id,'reject')}>Rechazar</button></div>}
     </article>)}</div>}
     {editing&&<FinanceChangeReviewForm request={editing} onClose={()=>setEditing(null)} onApprove={approveEdit}/>}
+    <ConfirmDialog open={Boolean(bulkConfirm)} title={bulkConfirm==='approve'?'Aprobar solicitudes':'Rechazar solicitudes'} message={bulkConfirm?`¿${bulkConfirm==='approve'?'aprobar':'rechazar'} las ${selected.length} solicitudes seleccionadas? La operación será completa o no se aplicará.`:''} confirmLabel={bulkConfirm==='approve'?'Aprobar':'Rechazar'} tone={bulkConfirm==='reject'?'danger':'default'} busy={busy} onConfirm={doConfirmBulk} onCancel={()=>{if(!busy)setBulkConfirm(null)}}/>
   </div>;
 }
 

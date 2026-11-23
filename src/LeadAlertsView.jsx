@@ -10,14 +10,14 @@ const formatDate = value => value
 const CSS = `
 .lead-alerts{display:grid;gap:12px}
 .lead-alerts-counts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
-.lead-alerts-count{display:grid;gap:4px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.lead-alerts-count{display:grid;gap:4px;padding:12px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--card)}
 .lead-alerts-count strong{font-size:24px}
 .lead-alerts-list{display:grid;gap:10px}
-.lead-alert-item{display:grid;gap:8px;padding:14px;border:1px solid var(--line);border-left:4px solid var(--alert-color);border-radius:12px;background:var(--card)}
+.lead-alert-item{display:grid;gap:8px;padding:14px;border:1px solid var(--line);border-left:4px solid var(--alert-color);border-radius:var(--r-md);background:var(--card)}
 .lead-alert-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .lead-alert-flags{display:flex;gap:6px;flex-wrap:wrap}
 .lead-alert-flags .pill{color:var(--alert-color)}
-.lead-alert-item p{margin:0;color:var(--mut);font-size:12px}
+.lead-alert-item p{margin:0;color:var(--mut);font-size:var(--fs-xs)}
 .lead-alert-item .btn{justify-self:start}
 `;
 

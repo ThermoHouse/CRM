@@ -1,12 +1,13 @@
 import {useCallback,useEffect,useMemo,useState} from 'react';
 import {sb} from './supabase';
+import {ConfirmDialog} from './ui';
 
 const dateKey=value=>value?String(value).slice(0,10):'';
 const localDateKey=date=>`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 const displayDate=value=>value?new Date(`${dateKey(value)}T12:00:00`).toLocaleDateString('es-MX',{dateStyle:'medium'}):'Sin fecha';
 const emptyForm=()=>({source:'new',leadId:'',cliente:'',whatsapp:'',email:'',sistema:'',vendedor:'',programacion:'',direccion:'',m2:'',status:'por_iniciar',intervalo:'2'});
 
-function Applications({canManage,canManageMaintenance=canManage}) {
+function Applications({canManage,canManageMaintenance=canManage,isRoot=false}) {
  const[works,setWorks]=useState([]);
  const[warranties,setWarranties]=useState([]);
  const[closedLeads,setClosedLeads]=useState([]);
@@ -20,6 +21,7 @@ function Applications({canManage,canManageMaintenance=canManage}) {
  const[leadError,setLeadError]=useState('');
  const[error,setError]=useState('');
  const[busy,setBusy]=useState(false);
+ const[pendingDelete,setPendingDelete]=useState(null);
 
  const load=useCallback(async()=>{
   setLoading(true);setLoadError('');setLeadError('');
@@ -93,10 +95,11 @@ function Applications({canManage,canManageMaintenance=canManage}) {
   finally{setBusy(false)}
  };
 
- const remove=async work=>{
-  if(!window.confirm(`¿Eliminar la aplicación de ${work.cliente||'este cliente'}? También se eliminará su agenda de mantenimiento.`))return;
+ const remove=work=>{setError('');setPendingDelete(work)};
+ const confirmRemove=async()=>{
+  const work=pendingDelete;if(!work)return;
   setError('');setBusy(true);
-  try{const{error:deleteError}=await sb.from('obras').delete().eq('id',work.id);if(deleteError)throw deleteError;await load()}
+  try{const{error:deleteError}=await sb.from('obras').delete().eq('id',work.id);if(deleteError)throw deleteError;setPendingDelete(null);await load()}
   catch(deleteError){setError(deleteError.message||'No se pudo eliminar la aplicación.')}
   finally{setBusy(false)}
  };
@@ -114,7 +117,7 @@ function Applications({canManage,canManageMaintenance=canManage}) {
  return <section className="applications-page">
   <div className="applications-heading"><div><span className="lbl">Agenda de instalaciones</span><h2>Aplicaciones</h2><p className="mut">Consulta fechas de aplicación y agenda los mantenimientos de cada cliente.</p></div>{canManage&&<button type="button" className="btn" onClick={openNew}>+ Nueva aplicación</button>}</div>
   {loadError&&<p className="data-alert" role="alert">No se pudieron cargar las aplicaciones o mantenimientos: {loadError}</p>}
-  {leadError&&canManage&&<p className="migration-hint" role="status">No se pudieron cargar las ventas cerradas para el formulario. Ejecuta <code>supabase/32_applications_calendar_and_maintenance.sql</code>. Aún puedes capturar un nuevo cliente.</p>}
+  {leadError&&canManage&&isRoot&&<p className="migration-hint" role="status">No se pudieron cargar las ventas cerradas para el formulario. Ejecuta <code>supabase/32_applications_calendar_and_maintenance.sql</code>. Aún puedes capturar un nuevo cliente.</p>}
   {error&&!form&&!maintenance&&<p className="data-alert" role="alert">{error}</p>}
   <section className="applications-calendar">
    <div className="applications-calendar-header"><div><span className="lbl">Calendario de aplicaciones y mantenimiento</span><h3>{month.toLocaleDateString('es-MX',{month:'long',year:'numeric'})}</h3></div><div className="calendar-nav"><button type="button" className="btn ghost" aria-label="Mes anterior" onClick={()=>setMonth(new Date(year,monthIndex-1,1))}>‹</button><button type="button" className="btn ghost" onClick={()=>{const today=localDateKey(new Date());setMonth(new Date());setDay(today)}}>Hoy</button><button type="button" className="btn ghost" aria-label="Mes siguiente" onClick={()=>setMonth(new Date(year,monthIndex+1,1))}>›</button></div></div>
@@ -144,6 +147,7 @@ function Applications({canManage,canManageMaintenance=canManage}) {
    {error&&<p className="data-alert" role="alert">{error}</p>}<div className="row"><button type="submit" className="btn" disabled={busy}>{busy?'Guardando…':'Guardar aplicación'}</button><button type="button" className="btn ghost" disabled={busy} onClick={()=>setForm(null)}>Cancelar</button></div>
   </form></div>}
   {maintenance&&<div className="modal"><form className="card application-form" onSubmit={saveMaintenance}><div className="row"><div style={{flex:1}}><span className="lbl">Agenda de mantenimiento</span><h3>{maintenance.cliente||'Cliente'}</h3></div><button type="button" className="btn ghost" disabled={busy} onClick={()=>setMaintenance(null)}>✕</button></div><p className="mut">Cada {maintenance.intervalo_anios||2} años · {maintenance.folio||'Sin folio'}</p><label htmlFor="scheduled-maintenance-date">Próxima fecha de mantenimiento</label><input id="scheduled-maintenance-date" type="date" value={maintenanceDate} onChange={event=>setMaintenanceDate(event.target.value)} required/>{error&&<p className="data-alert" role="alert">{error}</p>}<div className="row"><button type="submit" className="btn" disabled={busy}>{busy?'Guardando…':'Guardar fecha'}</button><button type="button" className="btn ghost" disabled={busy} onClick={()=>setMaintenance(null)}>Cancelar</button></div></form></div>}
+  <ConfirmDialog open={Boolean(pendingDelete)} title="Eliminar aplicación" message={pendingDelete?`¿Eliminar la aplicación de ${pendingDelete.cliente||'este cliente'}? También se eliminará su agenda de mantenimiento.`:''} confirmLabel="Eliminar" tone="danger" busy={busy} onConfirm={confirmRemove} onCancel={()=>{if(!busy)setPendingDelete(null)}}/>
  </section>;
 }
 

@@ -2,6 +2,7 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {sb} from './supabase';
 import logoUrl from './assets/thermo-house-logo.png';
 import {downloadBreakdownPdf} from './breakdownPdf';
+import {ConfirmDialog} from './ui';
 
 /* ============================================================
    Desglose de servicios profesionales
@@ -487,7 +488,7 @@ const loadDraft = () => {
   } catch { return null; }
 };
 
-export default function ServiceBreakdown({initialLead = null}) {
+export default function ServiceBreakdown({initialLead = null, isRoot = false}) {
   const draft = useMemo(() => (initialLead ? null : loadDraft()), [initialLead]);
   const [f, setF] = useState(() => draft?.form || {...blankForm(), ...(initialLead ? {lead_id: initialLead.id, ...fromLead(initialLead)} : {})});
   const [mode, setMode] = useState(() => (initialLead ? 'lead' : draft?.mode || 'lead'));
@@ -623,9 +624,7 @@ export default function ServiceBreakdown({initialLead = null}) {
     setF(current => ({...current, costo_maquina_hora, costo_hora: num(current.maquinas) > 0 ? num(current.maquinas) * num(costo_maquina_hora) : ''}));
   };
 
-  const download = async () => {
-    setMessage({type: '', text: ''});
-    if (pending.length && !window.confirm(`Faltan ${pending.length} dato(s). Se dejarán como línea en blanco para llenarlos a mano.\n\n¿Descargar el PDF de todos modos?`)) return;
+  const runDownload = async () => {
     setPdfBusy(true);
     try {
       await downloadBreakdownPdf(docRef.current, {name: f.cliente, folio: f.folio});
@@ -634,6 +633,14 @@ export default function ServiceBreakdown({initialLead = null}) {
     } finally {
       setPdfBusy(false);
     }
+  };
+  const download = async () => {
+    setMessage({type: '', text: ''});
+    if (pending.length) {
+      setConfirmState({type: 'download', message: `Faltan ${pending.length} dato(s). Se dejarán como línea en blanco para llenarlos a mano.\n\n¿Descargar el PDF de todos modos?`});
+      return;
+    }
+    await runDownload();
   };
 
   const save = async () => {
@@ -657,7 +664,8 @@ export default function ServiceBreakdown({initialLead = null}) {
       await loadSaved();
     } catch (error) {
       const missing = error.code === '42P01' || error.code === 'PGRST205' || /service_breakdowns/.test(error.message || '');
-      setMessage({type: 'error', text: missing ? 'Falta aplicar supabase/34_service_breakdowns.sql para poder guardar. Aún puedes descargar el PDF.' : error.message || 'No se pudo guardar.'});
+      const missingText = isRoot ? 'Falta aplicar supabase/34_service_breakdowns.sql para poder guardar. Aún puedes descargar el PDF.' : 'No se pudo guardar el desglose en este momento. Aún puedes descargar el PDF.';
+      setMessage({type: 'error', text: missing ? missingText : error.message || 'No se pudo guardar.'});
     } finally {
       setBusy(false);
     }
@@ -672,21 +680,31 @@ export default function ServiceBreakdown({initialLead = null}) {
     window.scrollTo({top: 0, behavior: 'smooth'});
   };
 
-  const removeSaved = async row => {
-    if (!window.confirm(`¿Eliminar el desglose de ${row.cliente || 'este cliente'}?`)) return;
+  const removeSaved = row => {
+    setConfirmState({type: 'delete', row});
+  };
+  const confirmRemoveSaved = async () => {
+    const row = confirmState?.row;
+    if (!row) return;
+    setBusy(true);
     const {error} = await sb.from('service_breakdowns').delete().eq('id', row.id);
-    if (error) { setMessage({type: 'error', text: error.message}); return; }
+    if (error) { setMessage({type: 'error', text: error.message}); setBusy(false); return; }
     if (row.id === savedId) setSavedId(null);
+    setConfirmState(null);
+    setBusy(false);
     await loadSaved();
   };
 
-  const reset = () => {
-    if (!window.confirm('¿Limpiar el formulario y empezar un desglose nuevo?')) return;
+  const doReset = () => {
     setF(blankForm());
     setLinked([]);
     setSavedId(null);
     setSearch('');
     setMessage({type: '', text: ''});
+    setConfirmState(null);
+  };
+  const reset = () => {
+    setConfirmState({type: 'reset'});
   };
 
   return (
@@ -877,7 +895,7 @@ export default function ServiceBreakdown({initialLead = null}) {
 
       <div className="card tbl sb-saved">
         <h3>Desgloses guardados</h3>
-        {savedState.missingTable && <p className="migration-hint" role="status">Para guardar desgloses ejecuta <code>supabase/34_service_breakdowns.sql</code>. Mientras tanto puedes llenar el formulario y descargar el PDF.</p>}
+        {savedState.missingTable && isRoot && <p className="migration-hint" role="status">Para guardar desgloses ejecuta <code>supabase/34_service_breakdowns.sql</code>. Mientras tanto puedes llenar el formulario y descargar el PDF.</p>}
         {savedState.error && <p className="data-alert" role="alert">{savedState.error}</p>}
         {!savedState.missingTable && !savedState.loading && !saved.length && <p className="mut">Aún no hay desgloses guardados.</p>}
         {saved.length > 0 && (
@@ -900,6 +918,21 @@ export default function ServiceBreakdown({initialLead = null}) {
           </table>
         )}
       </div>
+      <ConfirmDialog
+        open={Boolean(confirmState)}
+        title={confirmState?.type === 'delete' ? 'Eliminar desglose' : confirmState?.type === 'reset' ? 'Nuevo desglose' : 'Descargar PDF'}
+        message={confirmState?.type === 'delete' ? `¿Eliminar el desglose de ${confirmState.row?.cliente || 'este cliente'}?` : confirmState?.type === 'reset' ? '¿Limpiar el formulario y empezar un desglose nuevo?' : (confirmState?.message || '')}
+        confirmLabel={confirmState?.type === 'delete' ? 'Eliminar' : confirmState?.type === 'reset' ? 'Limpiar' : 'Descargar'}
+        tone={confirmState?.type === 'delete' ? 'danger' : 'default'}
+        busy={busy || pdfBusy}
+        onConfirm={async () => {
+          if (!confirmState) return;
+          if (confirmState.type === 'delete') await confirmRemoveSaved();
+          else if (confirmState.type === 'reset') doReset();
+          else if (confirmState.type === 'download') { setConfirmState(null); await runDownload(); }
+        }}
+        onCancel={() => { if (!busy && !pdfBusy) setConfirmState(null); }}
+      />
     </div>
   );
 }

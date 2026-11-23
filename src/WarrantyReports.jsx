@@ -1,6 +1,7 @@
 import {useCallback,useEffect,useMemo,useState} from 'react';
 import {sb} from './supabase';
 import {downloadWarrantyReportPdf} from './warrantyReportPdf';
+import {ConfirmDialog} from './ui';
 
 const dateKey=value=>value?String(value).slice(0,10):'';
 const today=()=>{const date=new Date();return`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`};
@@ -44,6 +45,7 @@ function WarrantyReports({canEdit,canManageMaintenance=false,canRegisterMaintena
  const[form,setForm]=useState(null);
  const[busy,setBusy]=useState(false);
  const[maintenanceBusy,setMaintenanceBusy]=useState(null);
+ const[maintenanceToComplete,setMaintenanceToComplete]=useState(null);
  const[pdfBusy,setPdfBusy]=useState(null);
  const[message,setMessage]=useState('');
  const[error,setError]=useState('');
@@ -65,7 +67,7 @@ function WarrantyReports({canEdit,canManageMaintenance=false,canRegisterMaintena
   if(failures.length){
    const missingReportTable=failures.some(item=>/warranty_reports|schema cache/i.test(item.message||''));
    setLoadError(missingReportTable
-    ?'Falta ejecutar supabase/39_warranty_report_workflow.sql para habilitar los reportes técnicos de garantía.'
+    ?(isRoot?'Falta ejecutar supabase/39_warranty_report_workflow.sql para habilitar los reportes técnicos de garantía.':'No se pudieron cargar los reportes de garantía en este momento.')
     :failures.map(item=>item.message).join(' · '));
   }else{
    setGuarantees(guaranteesResult.data||[]);
@@ -161,7 +163,7 @@ function WarrantyReports({canEdit,canManageMaintenance=false,canRegisterMaintena
   }catch(saveError){
    const message=saveError.message||'No se pudo guardar el reporte de garantía.';
    setError(saveError.code==='42501'||/row-level security|permission denied/i.test(message)
-    ?'Supabase rechazó el guardado. Ejecuta supabase/41_sales_warranty_admin_finance_delete.sql para habilitar a Ventas y vuelve a intentarlo.'
+    ?(isRoot?'Supabase rechazó el guardado. Ejecuta supabase/41_sales_warranty_admin_finance_delete.sql para habilitar a Ventas y vuelve a intentarlo.':'No tienes permisos para guardar este reporte de garantía en este momento.')
     :message);
   }
   finally{setBusy(false)}
@@ -180,12 +182,14 @@ function WarrantyReports({canEdit,canManageMaintenance=false,canRegisterMaintena
   }catch(openError){tab.close();setError(openError.message||'No se pudo abrir el PDF adjunto.')}
  };
 
- const markMaintenanceComplete=async guarantee=>{
-  if(!window.confirm(`¿Registrar como realizado el mantenimiento de ${guarantee.cliente||'este cliente'}? Se programará el siguiente ciclo.`))return;
+ const markMaintenanceComplete=guarantee=>{setError('');setMaintenanceToComplete(guarantee)};
+ const confirmMarkMaintenanceComplete=async()=>{
+  const guarantee=maintenanceToComplete;if(!guarantee)return;
   setError('');setMaintenanceBusy(guarantee.id);
   try{
    const{error:updateError}=await sb.rpc('complete_application_maintenance',{p_garantia_id:guarantee.id});
    if(updateError)throw updateError;
+   setMaintenanceToComplete(null);
    await load();
    setMessage('Mantenimiento registrado; el siguiente ciclo quedó programado.');
   }catch(updateError){setError(updateError.message||'No se pudo registrar el mantenimiento.')}
@@ -250,6 +254,7 @@ function WarrantyReports({canEdit,canManageMaintenance=false,canRegisterMaintena
    {error&&<p className="data-alert" role="alert">{error}</p>}
    <div className="row"><button type="submit" className="btn" disabled={busy}>{busy?'Guardando…':'Guardar reporte'}</button><button type="button" className="btn ghost" disabled={busy} onClick={()=>setForm(null)}>Cancelar</button></div>
   </form></div>}
+  <ConfirmDialog open={Boolean(maintenanceToComplete)} title="Registrar mantenimiento" message={maintenanceToComplete?`¿Registrar como realizado el mantenimiento de ${maintenanceToComplete.cliente||'este cliente'}? Se programará el siguiente ciclo.`:''} confirmLabel="Registrar" busy={Boolean(maintenanceBusy)} onConfirm={confirmMarkMaintenanceComplete} onCancel={()=>{if(!maintenanceBusy)setMaintenanceToComplete(null)}}/>
  </section>;
 }
 
