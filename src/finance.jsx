@@ -8,6 +8,12 @@ const monthKey=(date=new Date())=>`${date.getFullYear()}-${String(date.getMonth(
 const todayInput=()=>{const now=new Date();return `${monthKey(now)}-${String(now.getDate()).padStart(2,'0')}`};
 const showDate=value=>value?String(value).slice(0,10).split('-').reverse().join('/'):'—';
 const monthRange=month=>{const[year,mon]=month.split('-').map(Number);const next=mon===12?`${year+1}-01-01`:`${year}-${String(mon+1).padStart(2,'0')}-01`;return[`${month}-01`,next]};
+const yearRange=year=>[`${year}-01-01`,`${Number(year)+1}-01-01`];
+const pad2=n=>String(n).padStart(2,'0');
+const fmtDate=d=>`${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+const isoWeekRange=weekStr=>{const[y,w]=weekStr.split('-W').map(Number);const jan4=new Date(y,0,4,12);const day=(jan4.getDay()+6)%7;const mon1=new Date(y,0,4-day,12);const start=new Date(mon1);start.setDate(mon1.getDate()+(w-1)*7);const end=new Date(start);end.setDate(start.getDate()+7);return[fmtDate(start),fmtDate(end)]};
+const currentIsoWeek=(date=new Date())=>{const d=new Date(date.getFullYear(),date.getMonth(),date.getDate(),12);const day=(d.getDay()+6)%7;d.setDate(d.getDate()-day+3);const firstThu=new Date(d.getFullYear(),0,4,12);const week=1+Math.round((d-firstThu)/604800000);return `${d.getFullYear()}-W${pad2(week)}`};
+const periodRange=(type,month,week,year)=>type==='semana'?isoWeekRange(week):type==='año'?yearRange(year):monthRange(month);
 const sum=(rows,pick)=>rows.reduce((total,row)=>total+Number(pick(row)||0),0);
 const METODOS=[['efectivo','Efectivo'],['transferencia','Transferencia'],['tarjeta','Tarjeta'],['cheque','Cheque'],['caja_chica','Caja chica'],['otro','Otro']];
 const CAJA_TIPOS=[['reposicion','Reposición de caja'],['viatico','Viático a técnico'],['gasto','Gasto de caja'],['devolucion','Devolución de sobrante']];
@@ -115,22 +121,41 @@ function MovementForm({categorias,plazas,initial,onClose,onSaved,requestOnly=fal
 }
 
 function Libro({readOnly,canDelete,canRequestChanges=false}){
+  const[periodType,setPeriodType]=useState('mes');
   const[month,setMonth]=useState(monthKey());
+  const[week,setWeek]=useState(currentIsoWeek());
+  const[year,setYear]=useState(String(new Date().getFullYear()));
+  const[categoryId,setCategoryId]=useState('');
   const[categorias]=useQuery(()=>sb.from('finanzas_categorias').select('*').order('nombre'),[]);
   const[plazaRows]=useQuery(()=>sb.from('plazas').select('nombre').eq('activa',true).order('nombre'),[]);
-  const[rows,load,state]=useQuery(()=>{const[from,to]=monthRange(month);return sb.from('movimientos_financieros_vigentes').select('*, finanzas_categorias(nombre,naturaleza)').gte('fecha',from).lt('fecha',to).order('fecha',{ascending:false}).order('created_at',{ascending:false})},[month]);
+  const[from,to]=periodRange(periodType,month,week,year);
+  const[rows,load,state]=useQuery(()=>{
+    let q=sb.from('movimientos_financieros_vigentes').select('*, finanzas_categorias(nombre,naturaleza)').gte('fecha',from).lt('fecha',to);
+    if(categoryId)q=q.eq('categoria_id',categoryId);
+    return q.order('fecha',{ascending:false}).order('created_at',{ascending:false});
+  },[periodType,month,week,year,categoryId]);
   const[form,setForm]=useState(null);const[error,setError]=useState('');const[busy,setBusy]=useState(false);const[pendingDelete,setPendingDelete]=useState(null);
   const plazas=plazaRows.length?plazaRows.map(item=>item.nombre):['Morelos'];
   const income=sum(rows.filter(row=>row.tipo==='ingreso'),row=>row.monto);const expenses=sum(rows.filter(row=>row.tipo==='egreso'),row=>row.monto);
+  const selectedCategory=categorias.find(c=>c.id===categoryId);
+  const periodLabel=periodType==='semana'?`Semana ${week}`:periodType==='año'?`Año ${year}`:`Mes ${month}`;
   const openReceipt=async path=>{setError('');const{data,error:urlError}=await sb.storage.from('comprobantes').createSignedUrl(path,120);if(urlError||!data?.signedUrl){setError(urlError?.message||'No se pudo abrir el comprobante.');return}window.open(data.signedUrl,'_blank','noopener')};
   const remove=row=>{if(canRequestChanges){const reason=prompt('Motivo de la solicitud de eliminación:');if(reason===null)return;if(!reason.trim()){setError('Escribe el motivo de la solicitud.');return}setError('');setBusy(true);sb.rpc('submit_finance_change_request',{p_source_table:'movimientos_financieros',p_source_id:row.id,p_action:'delete',p_reason:reason.trim(),p_proposed_data:null}).then(({error:deleteError})=>{if(deleteError)throw deleteError;return load()}).catch(err=>setError(err.message||'No se pudo eliminar.')).finally(()=>setBusy(false));return;}setError('');setPendingDelete(row)};
   const confirmRemove=async()=>{const row=pendingDelete;if(!row)return;setError('');setBusy(true);try{const{error:deleteError}=await sb.from('movimientos_financieros').delete().eq('id',row.id);if(deleteError)throw deleteError;setPendingDelete(null);if(row.comprobante_path){const{error:receiptError}=await sb.storage.from('comprobantes').remove([row.comprobante_path]);if(receiptError){setError(`El movimiento se eliminó, pero no se pudo borrar su comprobante: ${receiptError.message}`);await load();return}}await load()}catch(err){setError(err.message||'No se pudo eliminar.')}finally{setBusy(false)}};
-  const exportCsv=async()=>{setError('');setBusy(true);try{await exportMonthCsv(month)}catch(err){setError(err.message)}finally{setBusy(false)}};
+  const exportCsv=()=>{setError('');try{const header=['Fecha','Tipo','Categoría','Naturaleza','Concepto','Plaza','Método de pago','Monto','Origen'];const data=rows.map(row=>[row.fecha,row.tipo,row.finanzas_categorias?.nombre||'',row.finanzas_categorias?.naturaleza||'',row.concepto||'',row.plaza||'',row.metodo_pago||'',row.monto,row.origen||'']);const suffix=categoryId?(selectedCategory?.nombre||'categoria').replace(/[^\w\-]+/g,'_'):'todas';downloadCsv(`finanzas-${periodType}-${from}-${to}-${suffix}.csv`,header,data)}catch(err){setError(err.message||'No se pudo exportar.')}};
   return <div className="card tbl">
-    <div className="row"><div style={{flex:1}}><span className="lbl">Libro</span><h3>Ingresos y egresos</h3></div><input type="month" aria-label="Mes" value={month} onChange={e=>e.target.value&&setMonth(e.target.value)}/><button type="button" className="btn ghost" disabled={busy} onClick={exportCsv}>Descargar para el contador (CSV)</button>{!readOnly&&<button type="button" className="btn" onClick={()=>setForm({})}>+ Movimiento</button>}</div>
-    <p className="mut">Los movimientos con una solicitud de corrección pendiente se excluyen temporalmente de este libro, los saldos y las exportaciones.</p>
-    <div className="grid kpi-grid"><Kpi label="Ingresos" value={money(income)} tone="ok"/><Kpi label="Egresos" value={money(expenses)} tone="bad"/><Kpi label="Balance" value={money(income-expenses)} tone={income-expenses<0?'bad':'ok'}/></div>
-    {error&&<p className="data-alert" role="alert">{error}</p>}<Feedback state={state} empty={!rows.length&&'No hay movimientos en este mes.'}/>
+    <div className="row"><div style={{flex:1}}><span className="lbl">Libro</span><h3>Ingresos y egresos</h3></div>{!readOnly&&<button type="button" className="btn" onClick={()=>setForm({})}>+ Movimiento</button>}</div>
+    <div className="row" style={{flexWrap:'wrap',gap:8,alignItems:'end',marginBottom:12}}>
+      <label style={{minWidth:140}}>Periodo<select aria-label="Tipo de periodo" value={periodType} onChange={e=>setPeriodType(e.target.value)}><option value="semana">Semana</option><option value="mes">Mes</option><option value="año">Año</option></select></label>
+      {periodType==='mes'&&<label style={{minWidth:160}}>Mes<input type="month" aria-label="Mes" value={month} onChange={e=>e.target.value&&setMonth(e.target.value)}/></label>}
+      {periodType==='semana'&&<label style={{minWidth:180}}>Semana<input type="week" aria-label="Semana" value={week} onChange={e=>e.target.value&&setWeek(e.target.value)}/></label>}
+      {periodType==='año'&&<label style={{minWidth:120}}>Año<input type="number" aria-label="Año" min="2000" max="2100" value={year} onChange={e=>e.target.value&&setYear(e.target.value)}/></label>}
+      <label style={{minWidth:220,flex:1}}>Categoría<select aria-label="Filtrar por categoría" value={categoryId} onChange={e=>setCategoryId(e.target.value)}><option value="">Todas las categorías</option>{categorias.map(c=><option key={c.id} value={c.id}>{c.nombre} ({c.tipo})</option>)}</select></label>
+      <button type="button" className="btn ghost" disabled={busy} onClick={exportCsv}>Exportar CSV</button>
+    </div>
+    <p className="mut">{periodLabel} · {from} a {to} (exclusivo){selectedCategory?` · Categoría: ${selectedCategory.nombre}`:''}. Los movimientos con una solicitud de corrección pendiente se excluyen temporalmente de este libro, los saldos y las exportaciones.</p>
+    <div className="grid kpi-grid"><Kpi label="Ingresos del periodo" value={money(income)} tone="ok"/><Kpi label="Gasto del periodo" value={money(expenses)} tone="bad"/><Kpi label="Balance del periodo" value={money(income-expenses)} tone={income-expenses<0?'bad':'ok'}/></div>
+    {error&&<p className="data-alert" role="alert">{error}</p>}<Feedback state={state} empty={!rows.length&&'No hay movimientos en este periodo.'}/>
     {rows.length>0&&<table><thead><tr><th>Fecha</th><th>Categoría</th><th>Concepto</th><th>Monto</th><th>Origen</th><th>Comprobante</th>{(!readOnly||canDelete||canRequestChanges)&&<th>Acciones</th>}</tr></thead><tbody>{rows.map(row=><tr key={row.id}>
       <td>{showDate(row.fecha)}</td><td>{row.finanzas_categorias?.nombre||'—'}<div className="mut">{row.finanzas_categorias?.naturaleza||''}</div></td><td>{row.concepto||'—'}</td>
       <td className={row.tipo==='ingreso'?'amount-in':'amount-out'}>{row.tipo==='ingreso'?'+':'−'}{money(row.monto)}</td><td>{ORIGEN_LABEL[row.origen]||row.origen}</td>
@@ -140,7 +165,6 @@ function Libro({readOnly,canDelete,canRequestChanges=false}){
     <ConfirmDialog open={Boolean(pendingDelete)} title="Eliminar movimiento" message="¿Eliminar este movimiento?" confirmLabel="Eliminar" tone="danger" busy={busy} onConfirm={confirmRemove} onCancel={()=>{if(!busy)setPendingDelete(null)}}/>
   </div>;
 }
-
 /* ---------- Caja chica y viáticos ---------- */
 function CajaChica({readOnly,canDelete,canRequestChanges=false}){
   const[saldos,loadSaldos]=useQuery(()=>sb.from('caja_chica_saldo').select('*'),[]);
