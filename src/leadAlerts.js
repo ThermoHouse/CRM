@@ -37,7 +37,8 @@ export function buildAlerts(leads, attempts = [], now = Date.now()) {
   }
 
   return leads.flatMap(lead => {
-    if (ALERT_RULES.excluded.includes(lead.status || 'nuevo')) return [];
+    const status = lead.status || 'nuevo';
+    if (ALERT_RULES.excluded.includes(status)) return [];
 
     const touchTimes = [
       timestamp(lead.last_contact_at),
@@ -50,11 +51,11 @@ export function buildAlerts(leads, attempts = [], now = Date.now()) {
     const flags = [];
     const nextCall = timestamp(lead.next_call_at);
 
-    if (nextCall !== null && nowTime - nextCall >= ALERT_RULES.overdueHours * HOUR) {
+    if (status !== 'contactado' && nextCall !== null && nowTime - nextCall >= ALERT_RULES.overdueHours * HOUR) {
       flags.push('llamada_vencida');
     }
     if (daysSinceTouch >= ALERT_RULES.abandonedDays) flags.push('abandonado');
-    if (lead.status === 'rescatar') flags.push('semaforo_abandonado');
+    if (status === 'rescatar') flags.push('semaforo_abandonado');
     if (!flags.length) return [];
 
     const overdue = flags.includes('llamada_vencida');
