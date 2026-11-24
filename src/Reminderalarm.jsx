@@ -37,7 +37,17 @@ async function savePushSubscription(subscription, settings) {
       before_minutes: settings.before,
     },
   });
-  if (error) throw new Error(error.message || 'No se pudo guardar la suscripción push.');
+  if (!error) return;
+  const status = error?.context?.status ?? error?.status;
+  const message = String(error?.message || '');
+  const conflict = status === 409 || /vinculada a otra cuenta/i.test(message);
+  if (conflict) {
+    try { await subscription.unsubscribe(); } catch {}
+    const err = new Error('Esta suscripcion push del navegador estaba vinculada a otra cuenta. Se desvinculo localmente; vuelve a activarla si la necesitas en esta cuenta.');
+    err.code = 'PUSH_SUBSCRIPTION_CONFLICT';
+    throw err;
+  }
+  throw new Error(message || 'No se pudo guardar la suscripcion push.');
 }
 
 const readJSON = (key, fallback) => {
@@ -203,7 +213,11 @@ export default function ReminderAlarm({ userId, userEmail, onOpenLeads, isRoot =
           setPushMessage('Avisos en segundo plano activos en este navegador.');
         }
       } catch (error) {
-        if (active) setPushMessage(error.message || 'No se pudo restaurar la suscripción push.');
+        if (active) {
+          setPushReady(false);
+          setPushEndpoint('');
+          setPushMessage(error.message || 'No se pudo restaurar la suscripcion push.');
+        }
       }
     };
     restoreSubscription();
@@ -363,6 +377,8 @@ export default function ReminderAlarm({ userId, userEmail, onOpenLeads, isRoot =
       setPushEndpoint(subscription.endpoint);
       setPushMessage('Avisos push activados. El sonido depende de los ajustes de notificaciones del sistema.');
     } catch (error) {
+      setPushReady(false);
+      setPushEndpoint('');
       setPushMessage(error.message || 'No se pudieron activar los avisos push.');
     } finally {
       setPushBusy(false);

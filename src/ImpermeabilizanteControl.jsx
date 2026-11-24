@@ -61,6 +61,13 @@ export default function ImpermeabilizanteControl({canEdit = false, isRoot = fals
   }, []);
 
   const nextNumero = useMemo(() => (rows.reduce((m, r) => Math.max(m, Number(r.numero) || 0), 0) || 0) + 1, [rows]);
+  const resumen = useMemo(() => {
+    const entradas = rows.reduce((sum, row) => sum + num(row.entrada_cubetas), 0);
+    const salidas = rows.reduce((sum, row) => sum + num(row.salida_cubetas), 0);
+    const ultimo = rows[0];
+    const disponibles = ultimo != null ? num(ultimo.inventario_final) : 0;
+    return {entradas, salidas, disponibles, movimientos: rows.length};
+  }, [rows]);
 
   const openNew = () => {
     setError('');
@@ -139,17 +146,43 @@ export default function ImpermeabilizanteControl({canEdit = false, isRoot = fals
   };
 
   return (
-    <div className="card tbl">
-      <div className="row">
-        <div style={{flex: 1}}>
+    <div className="card tbl imper-control">
+      <div className="row imper-header">
+        <div style={{flex: 1, minWidth: 220}}>
           <span className="lbl">Inventario</span>
-          <h3>Impermeabilizante · control de entradas y salidas</h3>
+          <h3 style={{margin: '4px 0 0'}}>Impermeabilizante · control de entradas y salidas</h3>
+          <p className="mut" style={{margin: '6px 0 0'}}>Registro en cubetas: inventario inicial, entradas, salidas e inventario final/resumido por movimiento.</p>
         </div>
         {canEdit && !missingTable && (
           <button type="button" className="btn" onClick={openNew}>+ Movimiento</button>
         )}
       </div>
-      <p className="mut">Registro en cubetas: inventario inicial, entradas, salidas e inventario final/resumido por movimiento.</p>
+
+      {!loading && !missingTable && (
+        <div className="imper-summary" aria-label="Resumen de cubetas de impermeabilizante">
+          <div className="imper-metric">
+            <span className="mut">Cubetas disponibles</span>
+            <strong>{fmt(resumen.disponibles)}</strong>
+            <small className="mut">Inventario final del último movimiento</small>
+          </div>
+          <div className="imper-metric is-in">
+            <span className="mut">Entradas registradas</span>
+            <strong>+{fmt(resumen.entradas)}</strong>
+            <small className="mut">Total de cubetas que entran</small>
+          </div>
+          <div className="imper-metric is-out">
+            <span className="mut">Salidas registradas</span>
+            <strong>-{fmt(resumen.salidas)}</strong>
+            <small className="mut">Total de cubetas que salen</small>
+          </div>
+          <div className="imper-metric">
+            <span className="mut">Movimientos</span>
+            <strong>{resumen.movimientos}</strong>
+            <small className="mut">Registros en el control</small>
+          </div>
+        </div>
+      )}
+
       {loading && <p className="mut">Cargando movimientos…</p>}
       {missingTable && isRoot && (
         <p className="migration-hint" role="status">
@@ -162,6 +195,7 @@ export default function ImpermeabilizanteControl({canEdit = false, isRoot = fals
       {error && <p className="data-alert" role="alert">{error}</p>}
       {!loading && !missingTable && rows.length === 0 && <p className="mut">No hay movimientos registrados.</p>}
       {!missingTable && rows.length > 0 && (
+        <div className="tbl-wrap imper-table-wrap">
         <table>
           <thead>
             <tr>
@@ -195,6 +229,7 @@ export default function ImpermeabilizanteControl({canEdit = false, isRoot = fals
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {form && (

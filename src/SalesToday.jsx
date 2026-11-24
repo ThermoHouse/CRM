@@ -5,7 +5,7 @@ import { buildAlerts, ALERT_RULES, FLAG_LABELS } from './leadAlerts';
 // Pantalla "Hoy" para el rol Ventas: lo que toca hacer ahora, sin filtros ni tablas de números.
 // Usa las mismas reglas que Alertas (leadAlerts.js), así los contadores coinciden con la pestaña Alertas de Leads.
 
-const COLORS = { rojo: '#dc2626', naranja: '#ea580c', amarillo: '#ca8a04' };
+const COLORS = { rojo: '#ef6b6b', naranja: '#f0a24f', amarillo: '#e6c35c' };
 const DAY = 86400000;
 const phone10 = v => String(v || '').replace(/\D/g, '').slice(-10);
 const sameDay = (iso, now) => !!iso && new Date(iso).toDateString() === new Date(now).toDateString();
@@ -13,28 +13,33 @@ const hhmm = iso => new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit',
 const PAGE = 10;
 
 const CSS = `
-.hoy{max-width:640px;margin:0 auto;display:grid;gap:16px;padding-bottom:24px}
-.hoy-header{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
-.hoy-counters{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.hoy-counter{border:2px solid transparent;border-radius:var(--r-md);padding:14px 8px;text-align:center;cursor:pointer;background:rgba(127,127,127,.08);color:inherit;font:inherit}
-.hoy-counter b{display:block;font-size:2rem;line-height:1.1}
-.hoy-counter span{font-size:12px;opacity:.85}
-.hoy-counter.active{border-color:var(--c);background:color-mix(in srgb,var(--c) 18%,transparent)}
-.hoy-list{display:grid;gap:10px}
-.hoy-item{border-left:5px solid var(--c);padding:10px 12px;border-radius:var(--r-sm);background:rgba(127,127,127,.08);display:grid;gap:4px}
-.hoy-name{font-size:1rem}
-.hoy-meta{font-size:13px;opacity:.85}
-.hoy-reason{font-size:13px}
-.hoy-miss{font-size:12px;opacity:.75}
-.hoy-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
-.hoy-actions a,.hoy-actions button{min-height:48px;display:flex;align-items:center;justify-content:center;text-align:center;text-decoration:none;border-radius:var(--r-md);font-weight:800;font-size:14px;border:0;cursor:pointer;font-family:inherit}
-.hoy-call{background:#2563eb;color:#fff}
-.hoy-wa{background:#16a34a;color:#fff}
-.hoy-done{background:#0f766e;color:#fff;grid-column:1/-1}
-.hoy-undo{background:transparent;color:inherit;border:1px solid rgba(127,127,127,.45)!important;font-size:13px}
-.hoy-empty{text-align:center;padding:28px 12px;opacity:.85}
-.hoy-empty b{display:block;font-size:1.15rem;margin-bottom:6px}
-@media(max-width:420px){.hoy-counters{grid-template-columns:1fr 1fr 1fr}.hoy-counter b{font-size:1.6rem}}
+.hoy{max-width:720px;margin:0 auto;display:grid;gap:20px;padding-bottom:24px}
+.hoy-head{display:grid;gap:4px}
+.hoy-head h2{margin:0;font-size:1.8rem;line-height:1.1}
+.hoy-counters{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.hoy-counter{border:1px solid var(--line);border-radius:var(--r-lg,14px);padding:16px 10px;text-align:center;cursor:pointer;background:var(--card2,rgba(127,127,127,.06));color:inherit;font:inherit;transition:transform .15s ease,border-color .2s ease,background .2s ease,box-shadow .2s ease}
+.hoy-counter:hover{transform:translateY(-1px);border-color:color-mix(in srgb,var(--c,var(--line)) 45%,var(--line))}
+.hoy-counter b{display:block;font-size:2rem;line-height:1.05}
+.hoy-counter span{display:block;margin-top:4px;font-size:12px;color:var(--mut,#9aa4b2)}
+.hoy-counter.on{border-color:color-mix(in srgb,var(--c) 55%,var(--line));background:color-mix(in srgb,var(--c) 12%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,var(--c) 18%,transparent) inset}
+.hoy-list{display:grid;gap:14px}
+.hoy-item{border:1px solid var(--line);border-left:4px solid color-mix(in srgb,var(--c) 70%,var(--line));padding:16px;border-radius:var(--r-lg,14px);background:var(--card,rgba(127,127,127,.06));display:grid;gap:10px;transition:border-color .2s ease,background .2s ease}
+.hoy-item.done{opacity:.72}
+.hoy-top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 12px;align-items:baseline}
+.hoy-top strong{font-size:1.02rem}
+.hoy-why{display:flex;flex-wrap:wrap;gap:6px}
+.hoy-tip{font-size:13px;color:var(--mut,#9aa4b2);line-height:1.45}
+.hoy-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:2px}
+.hoy-actions a,.hoy-actions button{min-height:42px;display:inline-flex;align-items:center;justify-content:center;text-align:center;text-decoration:none;border-radius:12px;font-weight:600;font-size:14px;border:1px solid var(--line);cursor:pointer;font-family:inherit;transition:background .2s ease,border-color .2s ease,color .2s ease,transform .15s ease}
+.hoy-actions a:hover,.hoy-actions button:hover:not(:disabled){transform:translateY(-1px)}
+.hoy-actions .hoy-call{background:rgba(99,102,241,.14);color:#c7d2fe;border-color:rgba(99,102,241,.35)}
+.hoy-actions .hoy-wa{background:rgba(34,197,94,.12);color:#bbf7d0;border-color:rgba(34,197,94,.32)}
+.hoy-actions .hoy-register{grid-column:1/-1;background:color-mix(in srgb,var(--c,#64748b) 14%,transparent);color:inherit;border-color:color-mix(in srgb,var(--c,#64748b) 38%,var(--line))}
+.hoy-actions .hoy-register:disabled{opacity:.7;cursor:default;transform:none}
+.hoy-actions .hoy-disabled{opacity:.55;cursor:default;justify-content:center}
+.hoy-link{justify-self:start;background:transparent;border:none;color:var(--mut,#9aa4b2);font:inherit;font-size:13px;font-weight:500;text-decoration:underline;text-decoration-color:color-mix(in srgb,var(--mut,#9aa4b2) 45%,transparent);text-underline-offset:3px;padding:2px 0;cursor:pointer}
+.hoy-link:hover{color:inherit}
+@media(max-width:520px){.hoy-counters{grid-template-columns:repeat(3,1fr);gap:8px}.hoy-counter{padding:12px 6px}.hoy-counter b{font-size:1.6rem}}
 `;
 
 export default function SalesToday({ leads, statusLabels = {}, onOpen }) {
@@ -107,11 +112,11 @@ export default function SalesToday({ leads, statusLabels = {}, onOpen }) {
     return true;
   };
 
-  const counter = (key, label) => (
+  const counter = (key, label, accent) => (
     <button type="button" className={`hoy-counter ${filter === key ? 'on' : ''}`} aria-pressed={filter === key}
       onClick={() => { setFilter(filter === key ? '' : key); setShowAll(false); }}
-      style={{ color: key === 'hoy' ? undefined : COLORS.rojo }}>
-      <b>{counts[key]}</b><span style={{ color: 'inherit' }}>{label}</span>
+      style={{ '--c': accent }}>
+      <b style={{ color: accent }}>{counts[key]}</b><span>{label}</span>
     </button>
   );
 
@@ -124,9 +129,9 @@ export default function SalesToday({ leads, statusLabels = {}, onOpen }) {
       </div>
 
       <div className="hoy-counters">
-        {counter('hoy', 'Llamadas de hoy')}
-        {counter('vencidas', 'Vencidas')}
-        {counter('abandonados', 'Abandonados')}
+        {counter('hoy', 'Llamadas de hoy', '#a5b4fc')}
+        {counter('vencidas', 'Vencidas', COLORS.naranja)}
+        {counter('abandonados', 'Abandonados', COLORS.rojo)}
       </div>
 
       {error && <p className="data-alert" role="alert">{error}</p>}
@@ -137,9 +142,9 @@ export default function SalesToday({ leads, statusLabels = {}, onOpen }) {
           const { lead } = a;
           const isDone = !!done[lead.id];
           const tel = phone10(lead.whatsapp);
-          const color = COLORS[a.severity];
+          const color = COLORS[a.severity] || COLORS.amarillo;
           return (
-            <div key={lead.id} className={`hoy-item ${isDone ? 'done' : ''}`} style={{ '--c': color }}>
+            <article key={lead.id} className={`hoy-item ${isDone ? 'done' : ''}`} style={{ '--c': color }}>
               <div className="hoy-top">
                 <strong>{lead.nombre || 'Cliente sin nombre'}{lead.folio ? ` · ${lead.folio}` : ''}</strong>
                 <span className="mut">{statusLabels[lead.status] || lead.status} · {a.daysSinceTouch} d sin contacto</span>
@@ -148,16 +153,16 @@ export default function SalesToday({ leads, statusLabels = {}, onOpen }) {
                 {a.today && <span className="pill">Llamar a las {hhmm(lead.next_call_at)}</span>}
                 {a.flags.map(f => <span key={f} className="pill">{FLAG_LABELS[f]}</span>)}
               </div>
-              <div>💡 {a.suggestion}</div>
+              <div className="hoy-tip">💡 {a.suggestion}</div>
               <div className="hoy-actions">
-                {tel ? <a className="primary" href={`tel:+52${tel}`}>Llamar</a> : <span className="mut" style={{ alignSelf: 'center' }}>Sin teléfono</span>}
-                {tel && <a href={`https://web.whatsapp.com/send?phone=52${tel}`} target="_blank" rel="noopener noreferrer" onClick={() => { if (!isDone) register(lead, 'whatsapp'); }}>WhatsApp</a>}
-                <button type="button" disabled={busyId === lead.id || isDone} onClick={() => register(lead, 'llamada')}>
+                {tel ? <a className="hoy-call" href={`tel:+52${tel}`}>Llamar</a> : <span className="mut hoy-disabled">Sin teléfono</span>}
+                {tel && <a className="hoy-wa" href={`https://web.whatsapp.com/send?phone=52${tel}`} target="_blank" rel="noopener noreferrer" onClick={() => { if (!isDone) register(lead, 'whatsapp'); }}>WhatsApp</a>}
+                <button type="button" className="hoy-register" disabled={busyId === lead.id || isDone} onClick={() => register(lead, 'llamada')}>
                   {isDone ? '✓ Registrado' : busyId === lead.id ? 'Guardando…' : 'Registrar intento'}
                 </button>
               </div>
               {onOpen && <button type="button" className="hoy-link" onClick={() => onOpen(lead)}>Abrir lead</button>}
-            </div>
+            </article>
           );
         })}
       </div>
