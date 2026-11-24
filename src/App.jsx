@@ -5,6 +5,7 @@ import WarrantyReports from './WarrantyReports';
 import LeadAlerts from './LeadAlertsView';
 import ReminderAlarm from './Reminderalarm';
 import {ConfirmDialog} from './ui';
+import ImpermeabilizanteControl from './ImpermeabilizanteControl';
 import SalesToday from './SalesToday';
 import {buildLeadSpecifications,presentationLabel} from './leadPresentations';
 const ROLE_TABS={root:['Dashboard','Leads','Desglose','Visitas','Instalaciones','Cierres','Mantenimiento','Precios','Inventario','Finanzas','Solicitudes','Reportes','Usuarios','Auditoría','Perfil'],sales:['Hoy','Más','Dashboard','Leads','Desglose','Mantenimiento','Perfil'],operations:['Visitas','Instalaciones','Inventario','Perfil'],administrative:['Dashboard','Leads','Desglose','Visitas','Instalaciones','Cierres','Mantenimiento','Precios','Inventario','Finanzas','Solicitudes','Reportes','Perfil'],manager:['Dashboard','Leads','Desglose','Visitas','Instalaciones','Cierres','Mantenimiento','Precios','Inventario','Finanzas','Solicitudes','Reportes','Perfil']};
