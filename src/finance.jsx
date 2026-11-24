@@ -17,7 +17,7 @@ const periodRange=(type,month,week,year)=>type==='semana'?isoWeekRange(week):typ
 const sum=(rows,pick)=>rows.reduce((total,row)=>total+Number(pick(row)||0),0);
 const METODOS=[['efectivo','Efectivo'],['transferencia','Transferencia'],['tarjeta','Tarjeta'],['cheque','Cheque'],['caja_chica','Caja chica'],['otro','Otro']];
 const CAJA_TIPOS=[['reposicion','Reposición de caja'],['viatico','Viático a técnico'],['gasto','Gasto de caja'],['devolucion','Devolución de sobrante']];
-const ORIGEN_LABEL={manual:'Manual',anticipo:'Anticipo',caja_chica:'Caja chica'};
+const ORIGEN_LABEL={manual:'Manual',anticipo:'Anticipo',caja_chica:'Caja chica',nomina:'Nómina'};
 
 const csvCell=value=>{let text=String(value??'');if(/^[=+\-@]/.test(text)&&Number.isNaN(Number(text)))text="'"+text;return /[",\r\n]/.test(text)?`"${text.replace(/"/g,'""')}"`:text};
 function downloadCsv(name,header,rows){const text=[header,...rows].map(row=>row.map(csvCell).join(',')).join('\r\n');const blob=new Blob(['\ufeff'+text],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=name;document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url)}
@@ -299,10 +299,10 @@ export function FinanceChangeRequests({role}){
 }
 
 function Nomina({readOnly=false,canDelete=false}){
-  const[rows,load,state]=useQuery(()=>sb.from('nomina_registros').select('*').order('created_at',{ascending:false}),[]);
+  const[rows,load,state]=useQuery(()=>sb.from('nomina_registros').select('*').order('fecha_pago',{ascending:false}).order('created_at',{ascending:false}),[]);
   const[profiles,setProfiles]=useState([]);
   const[profilesError,setProfilesError]=useState('');
-  const blank=()=>({profile_id:'',nombre:'',cargo:'',salario_base_diario:'',bono_puntualidad:'',bono_desempeno:'',comisiones:'',multa_penalizaciones:''});
+  const blank=()=>({profile_id:'',nombre:'',cargo:'',fecha_pago:todayInput(),salario_base_diario:'',bono_puntualidad:'',bono_desempeno:'',comisiones:'',multa_penalizaciones:''});
   const[form,setForm]=useState(blank);
   const[editingId,setEditingId]=useState(null);
   const[busy,setBusy]=useState(false);
@@ -337,6 +337,7 @@ function Nomina({readOnly=false,canDelete=false}){
       profile_id:row.profile_id||'',
       nombre:row.nombre||'',
       cargo:row.cargo||'',
+      fecha_pago:row.fecha_pago||todayInput(),
       salario_base_diario:row.salario_base_diario??'',
       bono_puntualidad:row.bono_puntualidad??'',
       bono_desempeno:row.bono_desempeno??'',
@@ -350,21 +351,21 @@ function Nomina({readOnly=false,canDelete=false}){
     event.preventDefault();
     setFormError('');setError('');setBusy(true);
     try{
-      const row={
-        profile_id:form.profile_id||null,
-        nombre:(form.nombre||'').trim(),
-        cargo:(form.cargo||'').trim()||null,
-        salario_base_diario:toNum(form.salario_base_diario),
-        bono_puntualidad:toNum(form.bono_puntualidad),
-        bono_desempeno:toNum(form.bono_desempeno),
-        comisiones:toNum(form.comisiones),
-        multa_penalizaciones:toNum(form.multa_penalizaciones)
-      };
-      if(!row.nombre)throw new Error('Escribe el nombre.');
-      const query=editingId
-        ?sb.from('nomina_registros').update(row).eq('id',editingId)
-        :sb.from('nomina_registros').insert(row);
-      const{error:saveError}=await query;
+      const nombre=(form.nombre||'').trim();
+      if(!nombre)throw new Error('Escribe el nombre.');
+      if(!form.fecha_pago)throw new Error('Selecciona la fecha de pago/periodo.');
+      const{error:saveError}=await sb.rpc('save_nomina_registro',{
+        p_id:editingId||null,
+        p_profile_id:form.profile_id||null,
+        p_nombre:nombre,
+        p_cargo:(form.cargo||'').trim()||null,
+        p_fecha_pago:form.fecha_pago,
+        p_salario_base_diario:toNum(form.salario_base_diario),
+        p_bono_puntualidad:toNum(form.bono_puntualidad),
+        p_bono_desempeno:toNum(form.bono_desempeno),
+        p_comisiones:toNum(form.comisiones),
+        p_multa_penalizaciones:toNum(form.multa_penalizaciones)
+      });
       if(saveError)throw saveError;
       resetForm();await load();
     }catch(err){setFormError(err.message||'No se pudo guardar el registro de nómina.')}finally{setBusy(false)}
@@ -373,37 +374,38 @@ function Nomina({readOnly=false,canDelete=false}){
     const row=pendingDelete;if(!row)return;
     setError('');setBusy(true);
     try{
-      const{error:deleteError}=await sb.from('nomina_registros').delete().eq('id',row.id);
+      const{error:deleteError}=await sb.rpc('delete_nomina_registro',{p_id:row.id});
       if(deleteError)throw deleteError;
       if(editingId===row.id)resetForm();
       setPendingDelete(null);await load();
     }catch(err){setError(err.message||'No se pudo eliminar.')}finally{setBusy(false)}
   };
 
-  const tableMissing=/nomina_registros|nomina_profiles_directory|Could not find/i.test(state.error||profilesError||error||formError);
+  const tableMissing=/nomina_registros|nomina_profiles_directory|save_nomina_registro|delete_nomina_registro|fecha_pago|Could not find/i.test(state.error||profilesError||error||formError);
   const totalNomina=sum(rows,row=>row.total);
 
   return <div className="finance-stack">
     {!readOnly&&<form className="card finance-form" onSubmit={save}>
-      <div className="row"><div style={{flex:1}}><span className="lbl">Nómina</span><h3>{editingId?'Editar registro de nómina':'Formulario de nómina'}</h3><p className="mut" style={{margin:'4px 0 0'}}>Formulario aparte para crear perfiles manualmente o retomar usuarios que ya usan el CRM y registrar su nómina.</p></div>{editingId&&<button type="button" className="btn ghost" disabled={busy} onClick={resetForm}>Cancelar edición</button>}</div>
+      <div className="row"><div style={{flex:1}}><span className="lbl">Nómina</span><h3>{editingId?'Editar registro de nómina':'Formulario de nómina'}</h3><p className="mut" style={{margin:'4px 0 0'}}>Formulario aparte para crear perfiles manualmente o retomar usuarios que ya usan el CRM y registrar su nómina. Al guardar, el total se refleja como egreso en el Libro (gastos de la empresa).</p></div>{editingId&&<button type="button" className="btn ghost" disabled={busy} onClick={resetForm}>Cancelar edición</button>}</div>
       {profiles.length>0&&<><label htmlFor="nomina-profile">Retomar perfil del CRM (opcional)</label><select id="nomina-profile" value={form.profile_id||''} onChange={pickProfile} disabled={busy}><option value="">— Alta manual —</option>{profiles.map(profile=><option key={profile.id} value={profile.id}>{profile.display_name}{profile.email?` · ${profile.email}`:''}{profile.cargo?` · ${profile.cargo}`:''}</option>)}</select></>}
       {profilesError&&<p className="mut">No se pudieron cargar perfiles del CRM para precarga: {profilesError}{/nomina_profiles_directory|function|No autorizado/i.test(profilesError)?' (puedes dar de alta manualmente; ejecuta supabase/48_nomina.sql si falta la función).':''}</p>}
       <div className="form-grid">
         <label htmlFor="nomina-nombre">Nombre<input id="nomina-nombre" required maxLength={120} value={form.nombre} onChange={set('nombre')} disabled={busy}/></label>
         <label htmlFor="nomina-cargo">Cargo o posición<input id="nomina-cargo" maxLength={120} value={form.cargo} onChange={set('cargo')} disabled={busy}/></label>
+        <label htmlFor="nomina-fecha">Fecha de pago/periodo<input id="nomina-fecha" type="date" required value={form.fecha_pago} onChange={set('fecha_pago')} disabled={busy}/></label>
         <label htmlFor="nomina-salario">Salario base diario<input id="nomina-salario" type="number" min="0" step="0.01" value={form.salario_base_diario} onChange={set('salario_base_diario')} disabled={busy}/></label>
         <label htmlFor="nomina-puntualidad">Bono de puntualidad<input id="nomina-puntualidad" type="number" min="0" step="0.01" value={form.bono_puntualidad} onChange={set('bono_puntualidad')} disabled={busy}/></label>
         <label htmlFor="nomina-desempeno">Bono de desempeño<input id="nomina-desempeno" type="number" min="0" step="0.01" value={form.bono_desempeno} onChange={set('bono_desempeno')} disabled={busy}/></label>
         <label htmlFor="nomina-comisiones">Comisiones<input id="nomina-comisiones" type="number" min="0" step="0.01" value={form.comisiones} onChange={set('comisiones')} disabled={busy}/></label>
         <label htmlFor="nomina-multa">Multa o penalizaciones<input id="nomina-multa" type="number" min="0" step="0.01" value={form.multa_penalizaciones} onChange={set('multa_penalizaciones')} disabled={busy}/></label>
       </div>
-      <div className="card" style={{marginTop:8}}><span className="lbl">Total</span><strong className="big">{money(calcTotal(form))}</strong></div>
+      <div className="card" style={{marginTop:8}}><span className="lbl">Total</span><strong className="big">{money(calcTotal(form))}</strong><p className="mut" style={{margin:'4px 0 0'}}>Este total se registrará como egreso de nómina en el Libro para la fecha indicada.</p></div>
       {formError&&<p className="data-alert" role="alert">{formError}</p>}
       <div className="row" style={{justifyContent:'flex-end'}}>{editingId&&<button type="button" className="btn ghost" disabled={busy} onClick={resetForm}>Cancelar</button>}<button className="btn" type="submit" disabled={busy}>{busy?'Guardando…':editingId?'Guardar cambios':'Crear registro'}</button></div>
     </form>}
 
     <div className="card tbl">
-      <div className="row"><div style={{flex:1}}><span className="lbl">Nómina</span><h3>Registros de nómina</h3></div></div>
+      <div className="row"><div style={{flex:1}}><span className="lbl">Nómina</span><h3>Registros de nómina</h3><p className="mut" style={{margin:'4px 0 0'}}>Cada registro se refleja como egreso en el Libro de Finanzas (gastos de la empresa).</p></div></div>
       <div className="grid4" style={{marginBottom:12}}>
         <Kpi label="Registros" value={rows.length}/>
         <Kpi label="Total nómina" value={money(totalNomina)}/>
@@ -411,9 +413,10 @@ function Nomina({readOnly=false,canDelete=false}){
       {readOnly&&<p className="mut">Vista de solo lectura.</p>}
       {error&&<p className="data-alert" role="alert">{error}</p>}
       <Feedback state={state} empty={tableMissing?'':'No hay registros de nómina.'}/>
-      {tableMissing&&<p className="mut">Ejecuta <code>supabase/48_nomina.sql</code> en Supabase para habilitar Nómina.</p>}
-      {rows.length>0&&<div style={{overflowX:'auto'}}><table><thead><tr><th>Nombre</th><th>Cargo o posición</th><th>Salario base diario</th><th>Bono puntualidad</th><th>Bono desempeño</th><th>Comisiones</th><th>Multa o penalizaciones</th><th>Total</th>{!readOnly&&<th>Acciones</th>}</tr></thead><tbody>
+      {tableMissing&&<p className="mut">Ejecuta <code>supabase/48_nomina.sql</code> en Supabase para habilitar Nómina y su reflejo en Finanzas.</p>}
+      {rows.length>0&&<div style={{overflowX:'auto'}}><table><thead><tr><th>Fecha</th><th>Nombre</th><th>Cargo o posición</th><th>Salario base diario</th><th>Bono puntualidad</th><th>Bono desempeño</th><th>Comisiones</th><th>Multa o penalizaciones</th><th>Total</th>{!readOnly&&<th>Acciones</th>}</tr></thead><tbody>
         {rows.map(row=><tr key={row.id}>
+          <td>{showDate(row.fecha_pago)||'—'}</td>
           <td><strong>{row.nombre||'—'}</strong>{row.profile_id&&<div className="mut">Perfil CRM vinculado</div>}</td>
           <td>{row.cargo||'—'}</td>
           <td>{money(row.salario_base_diario)}</td>
@@ -427,7 +430,7 @@ function Nomina({readOnly=false,canDelete=false}){
       </tbody></table></div>}
     </div>
 
-    <ConfirmDialog open={Boolean(pendingDelete)} title="Eliminar registro de nómina" message={pendingDelete?`¿Eliminar el registro de ${pendingDelete.nombre||'nómina'}?`:' '} confirmLabel="Eliminar" tone="danger" busy={busy} onConfirm={confirmRemove} onCancel={()=>{if(!busy)setPendingDelete(null)}}/>
+    <ConfirmDialog open={Boolean(pendingDelete)} title="Eliminar registro de nómina" message={pendingDelete?`¿Eliminar el registro de ${pendingDelete.nombre||'nómina'}? También se eliminará su egreso reflejado en el Libro.`:' '} confirmLabel="Eliminar" tone="danger" busy={busy} onConfirm={confirmRemove} onCancel={()=>{if(!busy)setPendingDelete(null)}}/>
   </div>;
 }
 
