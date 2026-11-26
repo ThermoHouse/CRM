@@ -16,7 +16,7 @@ const CAT_COLORS=['var(--or)','var(--info)','var(--vio)','var(--warn)','var(--ok
 const toTime=v=>{if(!v)return null;const m=String(v).match(/^(\d{4})-(\d{2})-(\d{2})$/);const d=m?new Date(+m[1],+m[2]-1,+m[3]):new Date(v);const t=d.getTime();return Number.isNaN(t)?null:t};
 const isoDate=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 const advisorKey=v=>String(v||'').trim().toLowerCase();
-const advisorLabel=(v,advisors)=>advisors.find(a=>a.lookup_key===advisorKey(v))?.display_name||(v?'Nombre no disponible':'Sin asignar');
+const advisorLabel=(v,advisors)=>advisors.find(a=>a.lookup_key===advisorKey(v))?.display_name||(v||'Sin asignar');
 const money=n=>'$'+Math.round(n||0).toLocaleString('es-MX');
 const compact=n=>{const a=Math.abs(n||0),s=n<0?'−':'';return a>=1e6?`${s}$${(a/1e6).toFixed(a>=1e7?0:1)} M`:a>=1e3?`${s}$${Math.round(a/1e3)} k`:`${s}$${Math.round(a)}`};
 const pct=(c,p)=>p>0?Math.round((c-p)/p*1000)/10:null;
@@ -43,21 +43,30 @@ export function analyze(d,periodId,nowMs){
   const top=catRows.slice(0,5),rest=sum(catRows.slice(5).map(x=>x[1]));
   const egrCats=[...top,...(rest>0?[['Otras',rest]]:[])].map(([n,v],i)=>[n,v,CAT_COLORS[i]]);
 
-  const L=[],LP=[],leadsB=zeros(),salesB=zeros();
+  const L=[],LP=[],leadsB=zeros();
   for(const l of d.leads||[]){const t=toTime(l.fecha_contacto)??toTime(l.created_at);
-    if(inCur(t)){L.push(l);leadsB[bucket(t)]++;if(l.status==='cerrado')salesB[bucket(t)]++}else if(inPrev(t))LP.push(l)}
-  const sold=L.filter(l=>l.status==='cerrado'),soldP=LP.filter(l=>l.status==='cerrado');
+    if(inCur(t)){L.push(l);leadsB[bucket(t)]++}else if(inPrev(t))LP.push(l)}
+  // Una venta cuenta en el periodo en que se cerró: historial de estados > cierre > último movimiento del lead.
+  const cierres=d.cierres||[];
+  const closeAt={},cierreAt={};
+  for(const x of d.audit||[]){const t=toTime(x.cuando);if(t!==null&&!(closeAt[x.lead_id]>=t))closeAt[x.lead_id]=t}
+  for(const c of cierres){const t=toTime(c.created_at);if(c.lead_id&&t!==null&&!(cierreAt[c.lead_id]>=t))cierreAt[c.lead_id]=t}
+  const closeTime=l=>closeAt[l.id]??cierreAt[l.id]??toTime(l.last_contact_at)??toTime(l.fecha_contacto)??toTime(l.created_at);
+  const sold=[],soldP=[],salesB=zeros();
+  for(const l of d.leads||[]){if(l.status!=='cerrado')continue;const t=closeTime(l);if(inCur(t)){sold.push(l);salesB[bucket(t)]++}else if(inPrev(t))soldP.push(l)}
   const conv=L.length?sold.length/L.length*100:0,convP=LP.length?soldP.length/LP.length*100:0;
   const has=(l,list)=>list.includes(l.status||'nuevo');
   const funnel=[['Leads',L.length],
     ['Contactados',L.filter(l=>!has(l,['nuevo','rescatar'])).length],
     ['Interesados',L.filter(l=>has(l,['interesado','en_proceso','confirmado','visita','visitado','cerrado'])).length],
     ['Con visita',L.filter(l=>has(l,['visita','visitado','cerrado'])).length],
-    ['Cerrados',sold.length]];
+    ['Cerrados',L.filter(l=>l.status==='cerrado').length]];
 
   const bySeller={};
-  for(const l of L){const k=advisorKey(l.asesor)||'_';const s=bySeller[k]||(bySeller[k]={key:k,asesor:l.asesor,leads:0,ventas:0,monto:0});s.leads++;if(l.status==='cerrado'){s.ventas++;s.monto+=Number(l.total)||0}}
-  const sellers=Object.values(bySeller).sort((a,b)=>b.monto-a.monto||b.leads-a.leads).slice(0,6);
+  const seller=asesor=>{const k=advisorKey(asesor)||'_';return bySeller[k]||(bySeller[k]={key:k,asesor,leads:0,ventas:0,monto:0})};
+  for(const l of L)seller(l.asesor).leads++;
+  for(const l of sold){const s=seller(l.asesor);s.ventas++;s.monto+=Number(l.total)||0}
+  const sellers=Object.values(bySeller).sort((a,b)=>b.monto-a.monto||b.ventas-a.ventas||b.leads-a.leads).slice(0,8);
 
   const visB=zeros();let visT=0,visP=0;
   for(const v of d.visitas||[]){if(v.status!=='realizada')continue;const t=toTime(v.programacion);if(inCur(t)){visT++;visB[bucket(t)]++}else if(inPrev(t))visP++}
@@ -69,7 +78,6 @@ export function analyze(d,periodId,nowMs){
   const open=d.open||[];
   const overdue=buildAlerts(open,[],nowMs).filter(x=>x.flags.includes('llamada_vencida')).length;
   const rescatar=open.filter(l=>l.status==='rescatar').length;
-  const cierres=d.cierres||[];
   const cierresPend=cierres.filter(c=>c.status==='pendiente').length;
   const anticiposPend=cierres.filter(c=>c.status==='confirmado'&&c.anticipo_status==='pendiente').length;
   const stock={};
@@ -152,10 +160,10 @@ export function ExecutiveView({data,period,now,advisors=[],onGo}){
       <div className="card xd-s8"><h3>Ingresos, egresos y utilidad</h3><p className="sub">Barras naranja: ingresos. Barras azules: egresos. Línea verde: utilidad. {fmt(a.start)} al {fmt(a.end)}.</p><FlowChart labels={a.labels} ing={a.ing} egr={a.egr} util={a.utilB}/></div>
       <div className="card xd-s4"><h3>Requiere atención</h3><p className="sub">Estado de hoy, sin importar el periodo</p>
         {alerts.length?alerts.map(([tone,text,who,tab])=><button type="button" key={text} className="xd-alert" onClick={()=>onGo&&onGo(tab)}><span className="pill" style={{color:`var(--${tone})`}}>{who}</span><span>{text}</span></button>):<p className="mut">Todo al día: no hay pendientes.</p>}</div>
-      <div className="card xd-s5"><h3>Embudo comercial</h3><p className="sub">Leads del periodo según su estado actual</p>
+      <div className="card xd-s5"><h3>Embudo comercial</h3><p className="sub">Leads nuevos del periodo y hasta dónde llegaron</p>
         {a.funnel.map(([n,v],j)=><div className="xd-row" key={n}><span className="xd-fn">{n}</span><div className="xd-bar"><i style={{width:v/mx*100+'%',background:`color-mix(in srgb,var(--or) ${100-j*15}%,var(--info))`}}/></div><b>{v}</b><span className="mut xd-fp">{j&&a.funnel[j-1][1]?Math.round(v/a.funnel[j-1][1]*100)+' %':''}</span></div>)}</div>
-      <div className="card xd-s7"><h3>Rendimiento de vendedores</h3><p className="sub">Leads del periodo por vendedor</p>
-        {a.sellers.length?<div className="tbl"><table><thead><tr><th>Vendedor</th><th>Leads</th><th>Ventas</th><th>Conversión</th><th>Monto</th></tr></thead><tbody>{a.sellers.map(s=><tr key={s.key}><td><b>{advisorLabel(s.asesor,advisors)}</b></td><td>{s.leads}</td><td>{s.ventas}</td><td className="xd-conv"><div className="xd-bar"><i style={{width:Math.min(100,s.ventas/s.leads*100)+'%'}}/></div><span className="mut">{Math.round(s.ventas/s.leads*100)} %</span></td><td>{compact(s.monto)}</td></tr>)}</tbody></table></div>:<p className="mut">No hay leads en este periodo.</p>}</div>
+      <div className="card xd-s7"><h3>Rendimiento de vendedores</h3><p className="sub">Leads nuevos y ventas cerradas en el periodo</p>
+        {a.sellers.length?<div className="tbl"><table><thead><tr><th>Vendedor</th><th>Leads</th><th>Ventas</th><th>Conversión</th><th>Monto</th></tr></thead><tbody>{a.sellers.map(s=><tr key={s.key}><td><b>{advisorLabel(s.asesor,advisors)}</b></td><td>{s.leads}</td><td>{s.ventas}</td><td className="xd-conv"><div className="xd-bar"><i style={{width:s.leads?Math.min(100,s.ventas/s.leads*100)+'%':'0%'}}/></div><span className="mut">{s.leads?Math.round(s.ventas/s.leads*100)+' %':'—'}</span></td><td>{compact(s.monto)}</td></tr>)}</tbody></table></div>:<p className="mut">No hay leads ni ventas en este periodo.</p>}</div>
       <div className="card xd-s4"><h3>A dónde se va el dinero</h3><p className="sub">Egresos por categoría</p>
         <div className="xd-donut"><Donut items={a.egrCats}/><div>{a.egrCats.length?a.egrCats.map(([n,v,c])=><div className="xd-leg" key={n}><i style={{background:c}}/><span>{n}</span><b>{compact(v)}</b></div>):<p className="mut">Sin egresos en este periodo.</p>}</div></div></div>
       <div className="card xd-s4"><h3>Stock de químicos</h3><p className="sub">Última medición con regla en barril</p>
@@ -176,7 +184,7 @@ export default function ExecutiveDashboard({advisors=[],now=Date.now(),onGo}){
     setState(s=>({...s,loading:true}));
     const t0=new Date();t0.setHours(0,0,0,0);const back=new Date(t0);back.setDate(back.getDate()-740);
     const jobs=[
-      ['leads',sb.from('leads').select('id,status,total,asesor,plaza,created_at,fecha_contacto').gte('created_at',back.toISOString()).order('created_at',{ascending:false}).range(0,4999)],
+      ['leads',sb.from('leads').select('id,status,total,asesor,plaza,created_at,fecha_contacto,last_contact_at').gte('created_at',back.toISOString()).order('created_at',{ascending:false}).range(0,4999)],
       ['open',sb.from('leads').select('id,status,next_call_at,last_contact_at,fecha_contacto,created_at').not('status','in','(cerrado,no)').range(0,4999)],
       ['mov',sb.from('movimientos_financieros_vigentes').select('fecha,tipo,monto,finanzas_categorias(nombre,naturaleza)').gte('fecha',isoDate(back)).range(0,9999)],
       ['caja',sb.from('caja_chica_saldo').select('*')],
@@ -185,12 +193,13 @@ export default function ExecutiveDashboard({advisors=[],now=Date.now(),onGo}){
       ['visitas',sb.from('visitas').select('id,status,programacion').gte('programacion',back.toISOString()).range(0,4999)],
       ['obras',sb.from('obras').select('id,cliente,m2,status,programacion').gte('programacion',isoDate(back)).range(0,4999)],
       ['garantias',sb.from('garantias').select('id,proximo_mtto').not('proximo_mtto','is',null).range(0,4999)],
-      ['cierres',sb.from('cierres').select('id,status,anticipo_status').neq('status','cancelado').range(0,4999)],
-      ['solicitudes',sb.from('finance_change_requests').select('id',{count:'exact',head:true}).eq('status','pending')],
+      ['audit',sb.from('lead_audit').select('lead_id,cuando').eq('a','cerrado').gte('cuando',back.toISOString()).range(0,9999)],
+      ['cierres',sb.from('cierres').select('id,lead_id,status,anticipo_status,created_at').neq('status','cancelado').range(0,4999)],
+      ['solicitudes',sb.rpc('list_finance_change_requests',{p_status:'pending'})],
     ];
     const results=await Promise.allSettled(jobs.map(j=>j[1]));
     const data={},failed=[];
-    results.forEach((r,i)=>{const key=jobs[i][0];if(r.status==='fulfilled'&&!r.value.error)data[key]=key==='solicitudes'?(r.value.count||0):(r.value.data||[]);else failed.push(SOURCE_LABELS[key])});
+    results.forEach((r,i)=>{const key=jobs[i][0];if(r.status==='fulfilled'&&!r.value.error)data[key]=key==='solicitudes'?(r.value.data||[]).length:(r.value.data||[]);else if(key==='audit')data.audit=[];else failed.push(SOURCE_LABELS[key])});
     setState({loading:false,data,failed});
   },[]);
   useEffect(()=>{load();const t=setInterval(load,300000);return()=>clearInterval(t)},[load]);

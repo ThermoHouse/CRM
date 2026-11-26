@@ -19,13 +19,14 @@ Dependen del periodo: ingresos, egresos, utilidad, gráfica, egresos por categor
 Son del estado de hoy: caja chica, alertas, stock e instalaciones próximas (7 días).
 
 ## De dónde salen los datos
-leads · movimientos_financieros_vigentes · caja_chica_saldo · stock_resumen · impermeabilizante_movimientos · visitas · obras · garantias · cierres · finance_change_requests.
+leads · lead_audit (opcional) · movimientos_financieros_vigentes · caja_chica_saldo · stock_resumen · impermeabilizante_movimientos · visitas · obras · garantias · cierres · list_finance_change_requests (RPC).
 Si una fuente falla (por ejemplo, una migración sin aplicar), el resto sigue funcionando y se muestra un aviso con el nombre de la sección.
 
 ## Definiciones
-- Venta cerrada: lead con estado "cerrado" dentro de los leads del periodo (fecha de contacto, o de creación si no hay). Es la misma regla que usaba el dashboard anterior.
-- Conversión: ventas cerradas entre leads del periodo.
-- Embudo: Leads, Contactados, Interesados, Con visita y Cerrados, según el estado actual del lead.
+- Venta cerrada: lead que hoy está en estado "cerrado". Cuenta en el periodo en que se cerró, tomando la fecha del historial de estados (`lead_audit`), si no existe la del cierre (`cierres`) y si no el último movimiento del lead. Así una venta de un lead viejo cuenta cuando se cerró, no cuando entró.
+- Vendedores: leads nuevos del periodo y ventas cerradas en el periodo, por vendedor. Si un vendedor no está en el directorio de Ventas (por ejemplo, root, administrativo o gerente que capturó el lead), se muestra su correo en lugar de "Nombre no disponible".
+- Conversión: ventas cerradas del periodo entre leads nuevos del periodo.
+- Embudo: leads nuevos del periodo y hasta dónde llegaron según su estado actual (Leads, Contactados, Interesados, Con visita, Cerrados).
 - Las alertas llevan a la pestaña correspondiente al hacer clic.
 
 ## Nota
