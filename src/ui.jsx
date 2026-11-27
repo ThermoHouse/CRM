@@ -222,7 +222,7 @@ export function ConfirmDialog({
           </button>
         </div>
         <div style={{marginTop: 12, display: 'grid', gap: 8}}>
-          {message ? <p style={{margin: 0}}>{message}</p> : null}
+          {message ? <p style={{margin: 0, whiteSpace: 'pre-line'}}>{message}</p> : null}
           {children}
         </div>
         <div className="row" style={{justifyContent: 'flex-end', marginTop: 18, gap: 8}}>

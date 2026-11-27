@@ -503,6 +503,7 @@ export default function ServiceBreakdown({initialLead = null, isRoot = false}) {
   const [savedState, setSavedState] = useState({loading: true, error: '', missingTable: false});
   const [busy, setBusy] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [confirmState, setConfirmState] = useState(null);
   const [message, setMessage] = useState({type: '', text: ''});
   const docRef = useRef(null);
 
