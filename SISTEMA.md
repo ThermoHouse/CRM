@@ -114,6 +114,7 @@ La pantalla operativa administra barriles por plaza, material (isocianato o resi
 ### Usuarios, auditoría y perfil
 
 - **Usuarios:** root asigna roles y gestiona bajas desde la lista. Dar de baja es una desactivación lógica: conserva el perfil y sus identificadores para mantener el histórico, quita el rol para revocar el acceso, registra la acción en `security_events` y oculta al usuario de la lista. El usuario no puede darse de baja a sí mismo ni puede desactivarse al último root. Requiere ejecutar `supabase/36_user_deactivation.sql`; no se debe eliminar la cuenta directamente desde Supabase Auth porque eso puede afectar referencias históricas.
+- **Atribución histórica:** los nombres de asesores, responsables de seguimiento y autores de actividad se resuelven desde perfiles de cualquier puesto, no solo desde usuarios cuyo rol actual es `sales`. Los perfiles dados de baja siguen disponibles para lectura histórica. Ejecuta `supabase/49_historical_people_directory.sql`; las listas para nuevas asignaciones de seguimiento continúan limitadas a vendedores activos.
 - **Auditoría:** root consulta eventos de actividad registrados por la base de datos. La bitácora guarda metadatos; no almacena una copia completa de los registros.
 - **Perfil:** el usuario puede editar los datos de su perfil. La integración opcional permite conectar Gmail; las fotos se almacenan en un bucket privado y los tokens de Gmail se cifran en servidor.
 - El frontend permite alternar tema claro/oscuro.

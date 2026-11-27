@@ -35,6 +35,7 @@ where email = 'root@empresa.com';
 24. Ejecuta `supabase/42_lead_generator_cost.sql` para guardar por separado el costo de planta de luz de 220V e incluirlo en los totales de las cotizaciones.
 25. En Supabase → Edge Functions → Secrets agrega `N8N_WEBHOOK_URL` y `N8N_WEBHOOK_SECRET` para que los vendedores puedan enviar WhatsApp desde el CRM.
 26. Local: configura `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, luego ejecuta `npm install` y `npm run dev`. En Vercel configura las mismas variables para los entornos que publiques.
+27. Para que la atribución histórica siga mostrando nombres cuando una persona cambia de puesto o se da de baja, ejecuta `supabase/49_historical_people_directory.sql` después de las migraciones previas (incluida `supabase/36_user_deactivation.sql`). Este directorio incluye todos los perfiles con puesto y perfiles desactivados; las nuevas asignaciones de seguimiento siguen limitadas a vendedores activos.
 
 ## Alarmas push de llamadas y citas
 
