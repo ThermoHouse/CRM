@@ -357,7 +357,9 @@ export function drawQuote(doc, l, logo) {
     ['TOTAL', money(d.grandTotal), true],
   ].forEach(([label, value, bold], index) => {
     const y = totalsTop + index * 14;
-    rect(150, y, 85, 14);
+    const isSubtotal = label === 'SUBTOTAL';
+    if (isSubtotal) rect(72, y, 78, 14, {fill: COLOR.yellow});
+    rect(150, y, 85, 14, {fill: isSubtotal ? COLOR.yellow : null});
     text(label, 72, y + 7, {bold: true});
     text(value, 232, y + 7, {align: 'right', bold});
   });

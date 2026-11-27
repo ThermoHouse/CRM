@@ -447,7 +447,7 @@ function BreakdownDocument({f, totals, docRef, productos}) {
           <tbody>
             <tr><td>Aplicación</td><td>{empty(totals.application) ? <Blank /> : money(totals.application)}</td></tr>
             <tr><td>Agregados</td><td>{totals.extras > 0 ? money(totals.extras) : '$0 (no incluidos)'}</td></tr>
-            <tr><td>Subtotal</td><td>{empty(totals.application) ? <Blank /> : money(totals.subtotal)}</td></tr>
+            <tr className="subtotal-highlight"><td>Subtotal</td><td>{empty(totals.application) ? <Blank /> : money(totals.subtotal)}</td></tr>
             <tr><td>IVA{f.iva_aplica ? ' (16%)' : ''}</td><td>{empty(totals.application) ? <Blank /> : f.iva_aplica ? money(totals.iva) : 'No aplica'}</td></tr>
             <tr className="sb-strong"><td>Total</td><td>{empty(totals.application) ? <Blank /> : money(totals.total)}</td></tr>
           </tbody>
@@ -862,7 +862,7 @@ export default function ServiceBreakdown({initialLead = null, isRoot = false}) {
           <div className="quote-price-summary">
             <span>Agregados<strong>{money(totals.extras)}</strong></span>
             <span>Aplicaciones<strong>{money(totals.application)}</strong></span>
-            <span>Subtotal<strong>{money(totals.subtotal)}</strong></span>
+            <span className="subtotal-highlight">Subtotal<strong>{money(totals.subtotal)}</strong></span>
             <span>IVA<strong>{money(totals.iva)}</strong></span>
             <span>Total<strong>{money(totals.total)}</strong></span>
           </div>

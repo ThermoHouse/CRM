@@ -30,6 +30,8 @@ Los roles del CRM son:
 
 La interfaz oculta los módulos no autorizados y pone en modo de solo lectura las pantallas correspondientes. Ventas consulta todos los leads, pero las políticas RLS conservan edición y eliminación solo para leads propios/asignados y restringen el registro de intentos de contacto. Requiere `supabase/40_sales_all_leads_read.sql`. La seguridad de los datos no depende solo de la interfaz: las migraciones configuran RLS y funciones/políticas en PostgreSQL. El esquema base y la migración de solicitudes de acceso dejan las tablas sin acceso hasta que la migración de roles instale políticas específicas; la migración 23 elimina políticas permisivas heredadas. La asignación de roles se realiza desde **Usuarios** para root. El primer root debe asignarse explícitamente siguiendo las instrucciones del README; el sistema no lo elige automáticamente por ser la única cuenta.
 
+En **Usuarios**, root puede abrir la **Papelera** para consultar cuentas dadas de baja y eliminarlas definitivamente. La confirmación exige escribir `ELIMINAR`. La purga borra la cuenta de Supabase Auth, el perfil, el avatar y la conexión Gmail; quita las atribuciones personales conocidas y conserva los registros comerciales, operativos y contables anonimizados. También elimina las solicitudes financieras iniciadas por esa cuenta y las notas de intentos de contacto. Requiere `supabase/50_permanently_delete_deactivated_users.sql` y desplegar `supabase/functions/permanently-delete-deactivated-user`. La acción es irreversible y no borra respaldos ni registros internos que Supabase retenga según sus políticas.
+
 ## Módulos y funciones
 
 ### Dashboard

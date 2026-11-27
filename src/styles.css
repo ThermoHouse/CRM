@@ -58,6 +58,8 @@ label{font-size:var(--fs-xs);font-weight:800;letter-spacing:.1em;text-transform:
 .appointment-form{display:grid;gap:10px}.appointment-form h3{margin:0}.appointment-form>p{margin:0 0 4px}.appointment-form label{margin:0}.appointment-form input,.appointment-form select{margin:0}.appointment-form .row{margin:6px 0 0}
 .field-hint{display:block;margin-top:4px;color:var(--mut);font-size:var(--fs-xs);line-height:1.4}
 .quote-price-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0 8px;padding:12px;background:var(--card2);border:1px solid var(--line);border-radius:var(--r-md)}.quote-price-summary span{display:grid;gap:5px;min-width:0;color:var(--mut);font-size:var(--fs-xs);font-weight:700}.quote-price-summary strong{color:var(--tx);font-size:15px;overflow-wrap:anywhere}.quote-price-summary span:last-child strong{color:var(--ok)}
+.quote-price-summary .subtotal-highlight{padding:8px;border-radius:var(--r-sm);background:#ffed00;color:#171717}.quote-price-summary .subtotal-highlight strong{color:#171717}
+.quote-totals .subtotal-highlight b,.quote-totals .subtotal-highlight span{background:#ffed00;color:#171717;font-weight:800}
 .quote-additional-presentations{padding:10px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .quote-additional-presentations>.row,.quote-presentation-row>.row,.quote-specifications-heading{align-items:center;justify-content:space-between}
 .quote-presentation-row{margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--card2)}
@@ -256,6 +258,7 @@ input.sb-pending,select.sb-pending{border-color:color-mix(in srgb,var(--or) 70%,
 .sb-table th{background:#0872ba;color:#fff;font-weight:700}
 .sb-table td:last-child,.sb-table th:last-child{text-align:right;white-space:nowrap}
 .sb-table .sb-strong td{background:#fff3e8;font-weight:800}
+.sb-table .subtotal-highlight td{background:#ffed00;color:#171717;font-weight:800}
 .sb-blank{display:inline-block;min-width:34px;height:1em;border-bottom:1px solid #111;vertical-align:baseline}
 .sb-doc:not(.sb-pdf) .sb-blank{background:#fff3cd;border-bottom-color:#e0a100}
 @media(max-width:600px){.sb-extra-works>.row{flex-wrap:wrap}.sb-work-item .f{grid-template-columns:1fr}}

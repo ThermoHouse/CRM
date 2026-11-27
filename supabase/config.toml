@@ -12,3 +12,6 @@ verify_jwt = false
 
 [functions.daily-dashboard-summary]
 verify_jwt = false
+
+[functions.permanently-delete-deactivated-user]
+verify_jwt = true
