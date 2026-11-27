@@ -306,3 +306,14 @@ input.sb-pending,select.sb-pending{border-color:color-mix(in srgb,var(--or) 70%,
 .xd-stock{margin:12px 0}.xd-sh{display:flex;justify-content:space-between;margin-bottom:6px}
 .xd-ins b{width:64px;flex:none}
 @media(max-width:900px){.xd-s4,.xd-s5,.xd-s7,.xd-s8{grid-column:span 12}}
+
+/* Calendario unificado: visitas técnicas y de garantía */
+.applications-heading-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.applications-filters{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}
+.applications-filters .btn{font-size:var(--fs-xs);padding:6px 11px}
+.applications-filters .btn.active{background:var(--or);color:#fff;border-color:var(--or)}
+.applications-legend .technical-dot{background:var(--warn,#d99a00)}
+.applications-legend .warranty-dot{background:var(--ok,#1f9d55)}
+.visit-technical-event .application-event-tag{color:var(--warn,#d99a00)}
+.visit-warranty-event .application-event-tag{color:var(--ok,#1f9d55)}
+@media(max-width:520px){.applications-heading-actions{width:100%;flex-direction:column}.applications-heading-actions .btn{width:100%}}
