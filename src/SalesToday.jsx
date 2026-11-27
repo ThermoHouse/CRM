@@ -61,7 +61,11 @@ export default function SalesToday({ leads, statusLabels = {}, onOpen }) {
   }, []);
 
   const { items, counts } = useMemo(() => {
-    const alerts = buildAlerts(leads, attempts, now);
+    const alerts = buildAlerts(leads, attempts, now).flatMap(alert => {
+      if (alert.lead.status !== 'sin_respuesta') return [alert];
+      const flags = alert.flags.filter(flag => flag !== 'abandonado');
+      return flags.length ? [{ ...alert, flags }] : [];
+    });
     const byId = new Map(alerts.map(a => [a.lead.id, a]));
     const lastAttempt = new Map();
     for (const a of attempts) { const v = new Date(a.attempted_at).getTime(); if (v > (lastAttempt.get(a.lead_id) || 0)) lastAttempt.set(a.lead_id, v); }
