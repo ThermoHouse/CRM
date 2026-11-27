@@ -32,6 +32,8 @@ La interfaz oculta los módulos no autorizados y pone en modo de solo lectura la
 
 En **Usuarios**, root puede abrir la **Papelera** para consultar cuentas dadas de baja y eliminarlas definitivamente. La confirmación exige escribir `ELIMINAR`. La purga borra la cuenta de Supabase Auth, el perfil, el avatar y la conexión Gmail; quita las atribuciones personales conocidas y conserva los registros comerciales, operativos y contables anonimizados. También elimina las solicitudes financieras iniciadas por esa cuenta y las notas de intentos de contacto. Requiere `supabase/50_permanently_delete_deactivated_users.sql` y desplegar `supabase/functions/permanently-delete-deactivated-user`. La acción es irreversible y no borra respaldos ni registros internos que Supabase retenga según sus políticas.
 
+El dueño de un lead puede editarlo aunque su departamento actual ya no sea Ventas. La relación se identifica por el correo guardado como asesor y por el usuario asignado al seguimiento; Root conserva acceso total. Operaciones tiene acceso a la pestaña **Leads**, limitada por RLS a los leads propios/asignados. Requiere ejecutar `supabase/51_lead_owner_edit_any_role.sql`.
+
 ## Módulos y funciones
 
 ### Dashboard
